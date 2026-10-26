@@ -682,4 +682,13 @@ startGame();
 // (Only in production builds; the dev server is excluded.)
 if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol !== 'file:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service worker non registrato', err)));
+  // When a new version has been downloaded, restart once to use it (progress is saved first).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    window.__bhi?.game?.persist();
+    location.reload();
+  });
 }
