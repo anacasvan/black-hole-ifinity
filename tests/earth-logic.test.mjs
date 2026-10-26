@@ -78,6 +78,22 @@ for (let n = 2; n <= 10; n++) {
   const avg = objs.reduce((s, k) => s + k.mass, 0) / objs.length;
   pace.push(`${t0.name}: ~${Math.round((massForRadius(t1.r) - massForRadius(t0.r)) / avg)} oggetti`);
 }
+// Missions: proposed in order, progress counted, rewards positive, early boost fades out.
+{
+  const { MISSIONS, activeMissions, missionReward, earlyBoost } = await import('../src/earth/missions.js');
+  const ids = new Set(MISSIONS.map(m => m.id));
+  ok(ids.size === MISSIONS.length, 'mission ids unique');
+  for (const m of MISSIONS) ok((m.kinds || []).every(k => KINDS[k]) && m.n > 0, `mission ${m.id} valid`);
+  let act = activeMissions([], {}, 0);
+  ok(act.length === 3 && act[0].id === 'leaf15' && act[0].have === 0, 'first missions at start');
+  act = activeMissions([], { leaf: 20 }, 0);
+  ok(act[0].have === 15, 'progress is capped at the goal');
+  act = activeMissions(['leaf15', 'litter10'], {}, 0);
+  ok(act.every(m => m.tier <= 2), 'missions beyond the next tier are not proposed');
+  ok(missionReward(0) > 0 && missionReward(1e6) > missionReward(10), 'reward grows with scale');
+  ok(earlyBoost(0.3) > 2 && earlyBoost(0.9) === 1, 'early boost only at the start');
+}
+
 console.log(`zones ${JSON.stringify(zones)}, ${buildings} buildings, ${props} props in 17x17 chunks`);
 console.log('pace:', pace.join(' | '));
 console.log(`earth-logic: ${checks} checks passed`);

@@ -9,11 +9,14 @@ import * as THREE from 'three';
 
 export const SHARED = {
   uDark: { value: 1.0 },   // 1 / fade depth below ground
+  uNight: { value: 0.0 },  // 0 day .. 1 night: lit windows, glowing lamps
+  uTime: { value: 0.0 },   // seconds, for wind
 };
 
 // [tile key, roughness, metalness, emissive, uv scale (1 / tile size in m)]
 export const BLD_PRESET = {
-  resA: ['resA', 0.82, 0, 0, 1], resB: ['resB', 0.82, 0, 0, 1], brick: ['brick', 0.9, 0, 0, 1],
+  resA: ['resA', 0.82, 0, 0, 1], resB: ['resB', 0.82, 0, 0, 1], resC: ['resC', 0.82, 0, 0, 1], brick: ['brick', 0.9, 0, 0, 1],
+  officeD: ['officeD', 0.1, 0.65, 0, 1],
   office: ['office', 0.12, 0.55, 0, 1], officeC: ['officeC', 0.55, 0.15, 0, 1], shop: ['shop', 0.4, 0.1, 0, 1],
   panel: ['panel', 0.82, 0, 0, 1], metal: ['metal', 0.55, 0.45, 0, 1],
   roofG: ['roofG', 0.95, 0, 0, 1 / 3], roofT: ['roofT', 0.78, 0, 0, 1 / 1.6],
@@ -28,7 +31,7 @@ export const GROUND_PRESET = {
 };
 // [tint by instance colour, roughness, metalness, emissive]
 export const OBJ_PRESET = {
-  paint: [1, 0.32, 0.35, 0], matte: [1, 0.75, 0, 0], foliage: [1, 0.9, 0, 0],
+  paint: [1, 0.32, 0.35, 0], matte: [1, 0.75, 0, 0], foliage: [1, 0.9, 0, -1], // emissive -1 = sways in the wind
   fixed: [0, 0.7, 0.05, 0], metal: [0, 0.35, 0.8, 0], glass: [0, 0.05, 0.9, 0], light: [0, 0.3, 0, 0.6], water: [0, 0.05, 0.1, 0],
 };
 const NO_REPEAT = new Set(['sign']);
@@ -67,7 +70,7 @@ export function stencilOutside(m) {
 }
 
 // atlas: { texture, rects } or null (instanced props: no texture, tint flag in aMat.x)
-function uber(name, atlas, tiles, { sink = true, envMapIntensity = 1.2 } = {}) {
+function uber(name, atlas, tiles, { sink = true, envMapIntensity = 1.2, windows = false } = {}) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity });
   const uni = {};
   if (atlas) {
@@ -78,12 +81,26 @@ function uber(name, atlas, tiles, { sink = true, envMapIntensity = 1.2 } = {}) {
   m.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uni);
     shader.uniforms.uBhDark = SHARED.uDark;
+    shader.uniforms.uNight = SHARED.uNight;
+    shader.uniforms.uTime = SHARED.uTime;
     const n = atlas ? tiles.length : 1;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 attribute vec4 aMat;
+uniform float uTime;
 varying vec4 vMat; varying vec2 vAUv; varying float vBhY;`)
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvAUv = uv; vMat = aMat;')
+      .replace('#include <begin_vertex>', atlas ? '#include <begin_vertex>' : `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  if (aMat.w < -0.5) {
+    // foliage sways gently in the wind (more at the top of the crown)
+    float swH = max(0.0, transformed.y - 0.6);
+    vec3 ip = instanceMatrix[3].xyz;
+    float ph = uTime * 1.6 + ip.x * 0.31 + ip.z * 0.27;
+    transformed.x += sin(ph) * swH * 0.03;
+    transformed.z += cos(ph * 0.83) * swH * 0.022;
+  }
+#endif`)
       .replace('#include <color_vertex>', `
 #if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )
   vColor = vec3(1.0);
@@ -97,19 +114,33 @@ varying vec4 vMat; varying vec2 vAUv; varying float vBhY;`)
       .replace('#include <project_vertex>', `#include <project_vertex>${sink ? SINK_V : ''}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec4 vMat; varying vec2 vAUv; varying float vBhY; uniform float uBhDark;
+varying vec4 vMat; varying vec2 vAUv; varying float vBhY; uniform float uBhDark; uniform float uNight;
 ${atlas ? `uniform sampler2D uAtlas; uniform vec4 uCells[${n}]; uniform float uRepeat[${n}];` : ''}`)
       .replace('#include <map_fragment>', atlas ? `
+  vec3 bhWin = vec3(0.0);
   {
     int ti = int(vMat.x + 0.5);
     vec4 cell = uCells[ti];
     vec2 f = uRepeat[ti] > 0.5 ? fract(vAUv) : clamp(vAUv, 0.0, 1.0);
     vec4 texel = textureGrad(uAtlas, cell.xy + f * cell.zw, dFdx(vAUv) * cell.zw, dFdy(vAUv) * cell.zw);
     diffuseColor *= texel;
+    ${windows ? `
+    if (uNight > 0.01) {
+      // bluish dark glass = window: some of them are lit at night
+      float lum = dot(texel.rgb, vec3(0.3, 0.59, 0.11));
+      float glass = step(texel.r + 0.025, texel.b) * step(lum, 0.62);
+      vec2 cellId = floor(vAUv);
+      float h = fract(sin(dot(cellId + vMat.x * 7.0, vec2(12.9898, 78.233))) * 43758.5453);
+      float lit = step(0.5, h);
+      vec3 warm = mix(vec3(1.0, 0.72, 0.4), vec3(0.85, 0.9, 1.0), step(0.85, h));
+      bhWin = warm * glass * lit * (0.7 + 0.6 * fract(h * 13.0));
+    }` : ''}
   }` : '')
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vMat.y;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vMat.z;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vMat.w;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+totalEmissiveRadiance += diffuseColor.rgb * max(vMat.w, 0.0) * (1.0 + uNight * 3.5);
+${atlas && windows ? 'totalEmissiveRadiance += bhWin * uNight * 1.6;' : ''}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>${sink ? SINK_F : ''}`);
   };
   m.customProgramCacheKey = () => `uber-${name}`;
@@ -129,7 +160,7 @@ export function makeMaterials(tex) {
   const bt = tileTable(BLD_PRESET, tex.bldAtlas);
   const gt = tileTable(GROUND_PRESET, tex.groundAtlas);
   const ground = stencilOutside(uber('ground', tex.groundAtlas, gt.tiles, { sink: false, envMapIntensity: 0.9 }));
-  const bld = uber('bld', tex.bldAtlas, bt.tiles, { envMapIntensity: 1.3 });
+  const bld = uber('bld', tex.bldAtlas, bt.tiles, { envMapIntensity: 1.3, windows: true });
   const obj = uber('obj', null, null, { envMapIntensity: 1.2 });
   const std = o => patchSink(new THREE.MeshStandardMaterial(o));
   const simple = {

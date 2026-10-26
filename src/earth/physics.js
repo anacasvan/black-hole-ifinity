@@ -59,6 +59,7 @@ export class Physics {
     const n = Math.min(6, Math.max(1, Math.ceil(dt / (1 / 240))));
     const h = dt / n;
     for (let s = 0; s < n; s++) for (const e of this.bodies) this.step(e, h, hole, R);
+    this.collide();
     for (let k = this.bodies.length - 1; k >= 0; k--) {
       const e = this.bodies[k];
       if (this.postStep(e, dt, hole)) this.bodies.splice(k, 1);
@@ -130,7 +131,7 @@ export class Physics {
     const s = e.s || 1, sx = e.sx || s;
     const hx = dims[0] * sx / 2, hy = dims[1] * s / 2, hz = dims[2] * s / 2;
     const dx = hole.x - e.x, dz = hole.z - e.z, d = Math.hypot(dx, dz) || 1;
-    const q = new THREE.Quaternion().setFromAxisAngle(UP, e.rot);
+    const q = e.q ? e.q.clone() : new THREE.Quaternion().setFromAxisAngle(UP, e.rot);
     const w = new THREE.Vector3();
     if (e.def.tall && e.stress > 0) {
       const tilt = Math.min(1, e.stress) ** 2 * 0.26;
@@ -263,6 +264,40 @@ export class Physics {
     b.sleep = contact && b.v.lengthSq() < 0.01 && b.w.lengthSq() < 0.01 ? b.sleep + h : 0;
   }
 
+  // Free bodies push each other apart (cars piling up at the rim, benches
+  // knocking into bins...). Approximate: vertical cylinders, inelastic.
+  collide() {
+    const B = this.bodies, n = B.length;
+    for (let i = 0; i < n; i++) {
+      const a = B[i].body;
+      if (a.simple || a.captured) continue;
+      const ra = Math.sqrt(a.hx * a.hz) * 1.15;
+      for (let j = i + 1; j < n; j++) {
+        const b = B[j].body;
+        if (b.simple || b.captured) continue;
+        if (Math.abs(a.p.y - b.p.y) > a.hy + b.hy) continue;
+        const rb = Math.sqrt(b.hx * b.hz) * 1.15;
+        const dx = b.p.x - a.p.x, dz = b.p.z - a.p.z;
+        const d2 = dx * dx + dz * dz, rs = ra + rb;
+        if (d2 >= rs * rs || d2 < 1e-8) continue;
+        const d = Math.sqrt(d2), nx = dx / d, nz = dz / d;
+        const ma = B[i].mass || 1, mb = B[j].mass || 1, wa = mb / (ma + mb), wb = ma / (ma + mb);
+        const pen = rs - d;
+        a.p.x -= nx * pen * wa; a.p.z -= nz * pen * wa;
+        b.p.x += nx * pen * wb; b.p.z += nz * pen * wb;
+        const vn = (b.v.x - a.v.x) * nx + (b.v.z - a.v.z) * nz;
+        if (vn < 0) {
+          a.v.x += nx * vn * wa; a.v.z += nz * vn * wa;
+          b.v.x -= nx * vn * wb; b.v.z -= nz * vn * wb;
+          if (vn < -0.3) {
+            a.w.y += (Math.random() - 0.5) * 0.4; b.w.y += (Math.random() - 0.5) * 0.4;
+            a.sleep = b.sleep = 0;
+          }
+        }
+      }
+    }
+  }
+
   // Returns true when the body leaves the simulation.
   postStep(e, dt, hole) {
     const b = e.body;
@@ -282,6 +317,7 @@ export class Physics {
       e.q = b.q.clone();
       e.body = null;
       e.state = 'rest';
+      if (e.key) this.g.save.markMoved(e.key, e.idx, e.x, e.y, e.z, e.q);
       this.g.world.renderRest(e);
       return true;
     }
@@ -352,8 +388,18 @@ export class Physics {
       this.g.fx.dust(c.bx + Math.cos(a) * hwX, e.y + 0.3, c.bz + Math.sin(a) * hwZ, Math.max(hwX, hwZ) * 0.5);
     }
     if (c.debrisT <= 0 && c.sink < e.top * 0.8) {
-      c.debrisT = 0.12;
-      this.g.fx.debris(c.bx - c.ux * hw, e.y + Math.random() * Math.min(e.top, 20), c.bz - c.uz * hw, Math.min(3, 0.15 + e.w * 0.03), e.it?.col ?? 0xbdb6aa);
+      c.debrisT = e.top > 30 ? 0.05 : 0.1;
+      const glass = e.kind === 'tower' || e.kind === 'supermarket';
+      const col = glass && Math.random() < 0.6 ? 0x9fc3d6 : (e.it?.col ?? 0xbdb6aa);
+      this.g.fx.debris(c.bx - c.ux * hw, e.y + Math.random() * Math.min(e.top, 20), c.bz - c.uz * hw, Math.min(3, 0.15 + e.w * 0.03), col);
+      // Pieces breaking off the upper floors once the building is leaning.
+      if (c.tilt > 0.28 && Math.random() < 0.5) {
+        const hgt = e.top * (0.55 + Math.random() * 0.4) - c.sink;
+        if (hgt > 0) {
+          const off = Math.sin(c.tilt) * hgt;
+          this.g.fx.debris(c.bx + c.ux * off + (Math.random() - 0.5) * hwX, e.y + Math.cos(c.tilt) * hgt, c.bz + c.uz * off + (Math.random() - 0.5) * hwZ, Math.min(5, 0.4 + e.w * 0.06), col);
+        }
+      }
     }
     if (c.sink > e.top + r * 0.8) { this.g.swallow(e); this.g.onCollapse(e, false); return true; }
     return false;

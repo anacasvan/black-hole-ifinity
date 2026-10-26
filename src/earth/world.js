@@ -48,6 +48,7 @@ export class World {
     const m = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.05 });
     m.onBeforeCompile = sh => {
       sh.uniforms.uBhDark = this.g.shared.uDark;
+      sh.uniforms.uNight = this.g.shared.uNight;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vLiteP; varying vec3 vLiteN; varying float vBhY;')
         .replace('#include <project_vertex>', `#include <project_vertex>
@@ -55,14 +56,18 @@ export class World {
   vLiteP = position * liteS; vLiteN = normal;
   vBhY = (modelMatrix * instanceMatrix * vec4(position, 1.0)).y;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vLiteP; varying vec3 vLiteN; varying float vBhY; uniform float uBhDark;')
+        .replace('#include <common>', '#include <common>\nvarying vec3 vLiteP; varying vec3 vLiteN; varying float vBhY; uniform float uBhDark; uniform float uNight; float bhLit = 0.0;')
         .replace('#include <color_fragment>', `#include <color_fragment>
   if (abs(vLiteN.y) < 0.5) {
     float u = abs(vLiteN.x) > 0.5 ? vLiteP.z : vLiteP.x;
     float fu = fract(u / 3.0), fv = fract(vLiteP.y / 3.2);
     float win = step(0.2, fu) * step(fu, 0.8) * step(0.3, fv) * step(fv, 0.82) * step(1.0, vLiteP.y);
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.22, 0.28), win * 0.75);
+    float hh = fract(sin(dot(floor(vec2(u / 3.0, vLiteP.y / 3.2)), vec2(12.9898, 78.233))) * 43758.5453);
+    bhLit = win * step(0.5, hh);
   } else { diffuseColor.rgb *= 0.72; }`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance += vec3(1.0, 0.74, 0.42) * bhLit * uNight * 1.4;`)
         .replace('#include <dithering_fragment>', `#include <dithering_fragment>
   gl_FragColor.rgb *= clamp(1.0 + min(vBhY, 0.0) * uBhDark, 0.0, 1.0);`);
     };
@@ -107,7 +112,17 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
     vec3 blockCol = h < 0.25 ? vec3(0.3, 0.4, 0.2) : (h < 0.55 ? vec3(0.42, 0.41, 0.38) : vec3(0.36, 0.43, 0.27));
     if (d.x < wx || d.y < wz) col = vec3(0.24, 0.25, 0.27);
     else if (d.x < wx + ${SIDEWALK.toFixed(1)} || d.y < wz + ${SIDEWALK.toFixed(1)}) col = vec3(0.6, 0.59, 0.56);
-    else col = blockCol;
+    else {
+      // Far away: suggest buildings on the blocks (roof patches on a lot grid).
+      col = blockCol;
+      vec2 lp = fract(p) * 4.0;
+      vec2 lot = floor(lp);
+      float lh = bhHash(blk * 4.0 + lot);
+      vec2 f = fract(lp);
+      float inside = step(0.18, f.x) * step(f.x, 0.82) * step(0.18, f.y) * step(f.y, 0.82);
+      vec3 roof = lh < 0.45 ? vec3(0.55, 0.3, 0.22) : (lh < 0.8 ? vec3(0.62, 0.61, 0.58) : vec3(0.42, 0.52, 0.6));
+      if (h >= 0.2 && lh > 0.15) col = mix(col, roof, inside);
+    }
     diffuseColor.rgb = col;
   }`);
     };
@@ -142,7 +157,7 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
   setView(hx, hz, camDist, quality) {
     const view = camDist * 1.0;
     this.fullR = Math.max(1, Math.min(quality === 'low' ? 1 : 2, Math.ceil(view / C)));
-    this.liteR = Math.max(this.fullR + 1, Math.min(quality === 'low' ? 7 : 11, Math.ceil((camDist * 2.6) / C) + 1));
+    this.liteR = Math.max(this.fullR + 1, Math.min(quality === 'low' ? 7 : quality === 'high' ? 15 : 12, Math.ceil((camDist * 2.6) / C) + 1));
     this.center = [Math.floor(hx / C), Math.floor(hz / C)];
   }
 
@@ -160,11 +175,44 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
       this.accum = 0;
       this.plan();
     }
+    // Detailed chunks are built a piece at a time (ground, batches of props,
+    // a few buildings) so streaming never blocks a frame for long.
     const t0 = performance.now();
-    while (this.queue.length && performance.now() - t0 < budgetMs) {
-      const job = this.queue.shift();
-      this.apply(job.i, job.j);
+    while (performance.now() - t0 < budgetMs) {
+      if (!this.job) {
+        const q = this.queue.shift();
+        if (!q) break;
+        this.job = this.begin(q.i, q.j);
+        continue;
+      }
+      const r = this.job.it.next();
+      if (r.done) { this.commit(this.job, r.value); this.job = null; }
     }
+  }
+
+  queued(i, j) { return (this.job && this.job.i === i && this.job.j === j) || this.queue.some(q => q.i === i && q.j === j); }
+
+  begin(i, j) {
+    const ch = this.chunks.get(chunkKey(i, j));
+    const want = this.desiredState(i, j);
+    if (ch && ch.state === want) return null;
+    if (want !== 'full') { this.apply(i, j); return null; }
+    if (ch && ch.entities.some(e => e.state !== 'rest' && e.state !== 'gone')) return null;
+    return { i, j, it: this.buildFullSteps(i, j) };
+  }
+
+  commit(job, next) {
+    const key = chunkKey(job.i, job.j);
+    const ch = this.chunks.get(key);
+    if (this.desiredState(job.i, job.j) !== 'full' || (ch && ch.entities.some(e => e.state !== 'rest' && e.state !== 'gone'))) {
+      this.unload(next);
+      return;
+    }
+    this.scene.add(next.group);
+    next.group.updateMatrixWorld(true);
+    if (ch) this.unload(ch);
+    this.chunks.set(key, next);
+    this.version = (this.version || 0) + 1;
   }
 
   plan() {
@@ -172,19 +220,20 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
     const R = this.liteR + 1;
     for (const ch of [...this.chunks.values()]) {
       const want = this.desiredState(ch.i, ch.j);
-      if (want !== ch.state && !this.queue.some(q => q.i === ch.i && q.j === ch.j)) this.queue.push({ i: ch.i, j: ch.j, d: Math.hypot(ch.i - ci, ch.j - cj) });
+      if (want !== ch.state && !this.queued(ch.i, ch.j)) this.queue.push({ i: ch.i, j: ch.j, d: Math.hypot(ch.i - ci, ch.j - cj) });
     }
     for (let i = ci - R; i <= ci + R; i++) for (let j = cj - R; j <= cj + R; j++) {
       const want = this.desiredState(i, j);
       if (!want) continue;
       const ch = this.chunks.get(chunkKey(i, j));
-      if ((!ch || ch.state !== want) && !this.queue.some(q => q.i === i && q.j === j)) this.queue.push({ i, j, d: Math.hypot(i - ci, j - cj) });
+      if ((!ch || ch.state !== want) && !this.queued(i, j)) this.queue.push({ i, j, d: Math.hypot(i - ci, j - cj) });
     }
     this.queue.sort((a, b) => (a.d - b.d));
   }
 
   // Build everything required right now (used at start-up / teleports).
   syncAll() {
+    if (this.job) { this.unload(drain(this.job.it)); this.job = null; }
     this.plan();
     while (this.queue.length) { const j = this.queue.shift(); this.apply(j.i, j.j); }
   }
@@ -198,7 +247,7 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
       return; // something is being pulled: retry on the next planning pass
     }
     let next = null;
-    if (want === 'full') next = this.buildFull(i, j);
+    if (want === 'full') { next = drain(this.buildFullSteps(i, j)); this.scene.add(next.group); next.group.updateMatrixWorld(true); }
     else if (want === 'lite') next = this.buildLite(i, j);
     if (ch) this.unload(ch);
     if (next) this.chunks.set(key, next);
@@ -238,29 +287,35 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
   }
 
   // ---- full detail ----------------------------------------------------------
-  buildFull(i, j) {
+  // Generator: yields between pieces of work; the caller adds ch.group to the scene.
+  *buildFullSteps(i, j) {
     const gen = this.gen(i, j);
+    yield;
     const key = chunkKey(i, j);
     const X0 = i * C, Z0 = j * C;
     const ch = { i, j, key, state: 'full', zone: gen.zone, gen, entities: [], X0, Z0 };
     const group = new THREE.Group();
     group.position.set(X0 - ORIGIN.x, 0, Z0 - ORIGIN.z);
     ch.group = group;
-    ch.originVersion = ORIGIN.version;
-
-    const ground = this.buildGround(i, j, gen);
-    group.add(ground);
-
+    group.add(this.buildGround(i, j, gen));
+    yield;
     const eaten = this.g.save.eatenSet(key);
     const bldList = [];
-    gen.items.forEach((it, idx) => {
-      if (eaten.has(idx)) return;
+    let n = 0;
+    for (let idx = 0; idx < gen.items.length; idx++) {
+      const it = gen.items[idx];
+      if (eaten.has(idx)) continue;
       if (it.t === 'b') bldList.push([it, idx]);
-      else this.spawnProp(ch, it, idx);
-    });
-    if (bldList.length) group.add(this.buildBuildings(ch, bldList));
-    this.scene.add(group);
-    group.updateMatrixWorld(true);
+      else { this.spawnProp(ch, it, idx); if (++n % 150 === 0) yield; }
+    }
+    const parts = [];
+    for (let k = 0; k < bldList.length; k++) {
+      this.buildingParts(ch, bldList[k][0], bldList[k][1], parts);
+      if (k % 3 === 2) yield;
+    }
+    if (parts.length) group.add(this.mergeBuildings(ch, parts));
+    // If the origin moved while building, place the group correctly.
+    group.position.set(X0 - ORIGIN.x, 0, Z0 - ORIGIN.z);
     return ch;
   }
 
@@ -283,6 +338,11 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
       const wp = this.pools.get(pool.model.wheelType ?? 'wheel');
       e.wheels = pool.model.wheels.map(() => wp.alloc());
       e.spin = 0;
+    }
+    const moved = this.g.save.movedPose(ch.key, idx);
+    if (moved) {
+      e.x = moved[0]; e.y = moved[1]; e.z = moved[2];
+      e.q = new THREE.Quaternion(moved[3], moved[4], moved[5], moved[6]).normalize();
     }
     this.renderRest(e);
     ch.entities.push(e);
@@ -322,22 +382,22 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
 
   // All buildings of a chunk in one mesh / one draw call; each building keeps
   // the vertex range it occupies so it can be detached later.
-  buildBuildings(ch, list) {
-    const parts = [];
-    for (const [it, idx] of list) {
-      const { geos, top } = buildBuilding(it);
-      const M = new THREE.Matrix4().compose(_p.set(it.x - ch.X0, CURB, it.z - ch.Z0), _q.setFromAxisAngle(UP, it.rot), _s.set(1, 1, 1));
-      const e = {
-        id: `${ch.key}:${idx}`, key: ch.key, idx, kind: it.kind, def: KINDS[it.kind], chunk: ch, it,
-        x: it.x, y: CURB, z: it.z, rot: it.rot, s: 1, sx: 1, top, w: it.w, d: it.d,
-        render: 'merged', ranges: [], state: 'rest', stress: 0, mass: it.mass, needR: it.needR, building: true,
-      };
-      for (const [k, g] of Object.entries(geos)) {
-        g.applyMatrix4(M);
-        parts.push([k, g, e]);
-      }
-      ch.entities.push(e);
+  buildingParts(ch, it, idx, parts) {
+    const { geos, top } = buildBuilding(it);
+    const M = new THREE.Matrix4().compose(_p.set(it.x - ch.X0, CURB, it.z - ch.Z0), _q.setFromAxisAngle(UP, it.rot), _s.set(1, 1, 1));
+    const e = {
+      id: `${ch.key}:${idx}`, key: ch.key, idx, kind: it.kind, def: KINDS[it.kind], chunk: ch, it,
+      x: it.x, y: CURB, z: it.z, rot: it.rot, s: 1, sx: 1, top, w: it.w, d: it.d,
+      render: 'merged', ranges: [], state: 'rest', stress: 0, mass: it.mass, needR: it.needR, building: true,
+    };
+    for (const [k, g] of Object.entries(geos)) {
+      g.applyMatrix4(M);
+      parts.push([k, g, e]);
     }
+    ch.entities.push(e);
+  }
+
+  mergeBuildings(ch, parts) {
     const geo = mergeKeyed(parts, this.mats.bldIndex);
     for (const r of geo.userData.ranges) r.tag.ranges.push(r);
     const mesh = new THREE.Mesh(geo, this.mats.bld);
@@ -548,6 +608,8 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
 
   // Re-render everything at rest after a floating-origin shift.
   onRebase() {
+    // A chunk half-built at the old origin is simply rebuilt.
+    if (this.job) { this.unload(drain(this.job.it)); this.job = null; }
     for (const ch of this.chunks.values()) {
       if (ch.group) ch.group.position.set(ch.X0 - ORIGIN.x, 0, ch.Z0 - ORIGIN.z);
       if (ch.group) ch.group.updateMatrixWorld(true);
@@ -574,6 +636,10 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
 }
 
 // ---------------------------------------------------------------------------
+
+function drain(it) {
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
 
 const LITE_GROUND = { park: 0x55783a, residential: 0x5b7a3d, downtown: 0x9a948a, commercial: 0x77787a, cbd: 0xaea697 };
 

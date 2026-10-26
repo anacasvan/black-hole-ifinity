@@ -333,7 +333,7 @@ export function buildBuilding(it) {
 // Representative colour for distant low-detail boxes.
 export function liteColor(it) {
   switch (it.kind) {
-    case 'tower': return it.style === 'officeC' ? 0xc5c1b8 : 0x7fa3b8;
+    case 'tower': return it.style === 'officeC' ? 0xc5c1b8 : it.style === 'officeD' ? 0x3e4c56 : 0x7fa3b8;
     case 'warehouse': return it.col;
     case 'supermarket': return 0xe4e2dc;
     default: return it.col ?? 0xd8d0c0;

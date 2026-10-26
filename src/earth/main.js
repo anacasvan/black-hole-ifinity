@@ -17,7 +17,9 @@ import { UI, formatMass } from './ui.js';
 import { CameraRig } from './camera.js';
 import { Post } from './post.js';
 import { Save, loadSettings, saveSettings } from './save.js';
-import { radiusForMass, progressInfo } from './config.js';
+import { radiusForMass, progressInfo, KINDS } from './config.js';
+import { activeMissions, missionReward, earlyBoost, MISSIONS } from './missions.js';
+import { DayNight } from './daynight.js';
 import { groundHeight, startPosition, C } from './citygen.js';
 import { ORIGIN, needsRebase, rebase } from './origin.js';
 
@@ -71,6 +73,11 @@ class Game {
     this.peds = new Peds(this);
     this.fx = new FX(this.scene, this.mats);
     this.post = new Post(renderer);
+    this.daynight = new DayNight(this);
+    this.daynight.t = this.save.dayTime;
+    this.slowmo = 0;
+    this.guideT = 0;
+    this.guideTarget = null;
 
     const start = startPosition();
     this.hole = { x: start.x, z: start.z, y: groundHeight(start.x, start.z), vx: 0, vz: 0, mass: 0, r: radiusForMass(0), attract: false };
@@ -148,7 +155,9 @@ class Game {
     this.settings = s;
     if (!transient) saveSettings(s);
     this.audio.setVolumes(s.music, s.sfx);
+    document.documentElement.style.setProperty('--ui', String(s.uiScale ?? 1));
     this.layoutControls();
+    if (this.save) this.checkMissions(false);
     const q = this.effectiveQuality();
     if (q !== this.appliedQuality || prevQ !== s.quality || this.reduceApplied !== s.reduceFx) this.applyQuality(q);
   }
@@ -253,6 +262,8 @@ class Game {
     this.input.setEnabled(true);
     this.layoutControls();
     if (!this.hasSave) this.ui.toast('Tieni premuto ATTRAI per attivare la gravità', 4.5);
+    this.save.stats.sessions = (this.save.stats.sessions || 0) + 1;
+    this.checkMissions(true);
   }
 
   pause() {
@@ -263,7 +274,7 @@ class Game {
     this.persist();
     const s = this.save.stats;
     const mins = Math.floor(s.time / 60);
-    this.ui.showPause(`Massa <b>${formatMass(this.hole.mass)}</b> · raggio <b>${this.hole.r.toFixed(2)} m</b><br>Oggetti inghiottiti <b>${s.eaten}</b> · edifici crollati <b>${s.collapsed}</b><br>Tempo di gioco <b>${mins} min</b>`);
+    this.ui.showPause(`Massa <b>${formatMass(this.hole.mass)}</b> · raggio <b>${this.hole.r.toFixed(2)} m</b><br>Oggetti inghiottiti <b>${s.eaten}</b> · edifici crollati <b>${s.collapsed}</b><br>Tempo di gioco <b>${mins} min</b> · ore <b>${this.daynight.label()}</b>`, this.settings.missions ? this.missionsHTML() : '');
   }
 
   resume() {
@@ -309,6 +320,7 @@ class Game {
   persist() {
     const s = this.save;
     s.mass = this.hole.mass; s.x = this.hole.x; s.z = this.hole.z;
+    s.dayTime = this.daynight.t;
     s.write();
   }
 
@@ -323,11 +335,16 @@ class Game {
 
   swallow(e) {
     if (e.state === 'gone') return;
-    const m = e.mass || 0;
+    const m = (e.mass || 0) * earlyBoost(this.hole.r);
     this.hole.mass += m;
-    this.save.stats.eaten++;
-    this.audio.swallow(m);
+    const st = this.save.stats;
+    st.eaten++;
+    st.maxMass = Math.max(st.maxMass || 0, this.hole.mass);
+    if (e.kind) this.save.countEaten(e.kind);
+    const cat = e.building ? 'building' : e.def?.cat === 'tree' || e.kind === 'bush' || e.kind === 'hedge' ? 'tree' : e.def?.cat;
+    this.audio.swallow(m, cat);
     this.ui.pulse();
+    this.holeVis.pulse(Math.min(1, 0.25 + Math.cbrt(m) / (this.hole.r * 6)));
     if (m > 0.5) this.haptic(Math.min(35, 5 + Math.cbrt(m) * 3));
     if (e.actor) e.system.remove(e);
     else this.world.removeEntity(e, true);
@@ -339,6 +356,49 @@ class Game {
       this.audio.chime();
       this.haptic(25);
     }
+    this.checkMissions(true);
+  }
+
+  // Optional goals: completing one gives a small push toward the next tier.
+  checkMissions(changed) {
+    if (!this.settings.missions) { this.ui.setMission(null); return; }
+    const s = this.save;
+    for (const m of activeMissions(s.missions, s.stats.byKind, this.hole.mass)) {
+      if (m.have < m.n) continue;
+      s.missions.push(m.id);
+      const bonus = missionReward(this.hole.mass);
+      this.hole.mass += bonus;
+      this.ui.toast(`Missione completata: ${m.text}`, 3.5);
+      this.audio.chime();
+      this.haptic(30);
+    }
+    const act = activeMissions(s.missions, s.stats.byKind, this.hole.mass);
+    this.ui.setMission(act[0] || null, changed);
+  }
+
+  missionsHTML() {
+    const s = this.save;
+    const act = activeMissions(s.missions, s.stats.byKind, this.hole.mass);
+    const rows = act.map(m => `<li><span>${m.text}</span><b>${m.have}/${m.n}</b></li>`).join('');
+    return `<h3>Missioni</h3><ul class="missions">${rows || '<li><span>Tutte le missioni disponibili sono completate</span></li>'}</ul>
+      <p class="muted">${s.missions.length} di ${MISSIONS.length} completate</p>`;
+  }
+
+  statsHTML() {
+    const s = this.save.stats;
+    const h = Math.floor(s.time / 3600), mi = Math.floor((s.time % 3600) / 60);
+    const top = Object.entries(s.byKind || {}).sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([k, n]) => `<li><span>${KINDS[k]?.label ?? k}</span><b>${n}</b></li>`).join('');
+    const maxR = radiusForMass(s.maxMass || this.hole.mass);
+    return `<ul class="missions">
+      <li><span>Tempo di gioco</span><b>${h ? `${h} h ` : ''}${mi} min</b></li>
+      <li><span>Massa attuale</span><b>${formatMass(this.hole.mass)}</b></li>
+      <li><span>Raggio massimo</span><b>${maxR.toFixed(2)} m</b></li>
+      <li><span>Oggetti inghiottiti</span><b>${s.eaten}</b></li>
+      <li><span>Edifici crollati</span><b>${s.collapsed}</b></li>
+      <li><span>Distanza percorsa</span><b>${((s.distance || 0) / 1000).toFixed(2)} km</b></li>
+      <li><span>Missioni completate</span><b>${this.save.missions.length}/${MISSIONS.length}</b></li>
+    </ul>${top ? `<h3>Più inghiottiti</h3><ul class="missions">${top}</ul>` : ''}`;
   }
 
   discard(e) {
@@ -354,6 +414,8 @@ class Game {
       this.rig.setFocus(e.x, e.z);
       this.haptic(40);
       this.save.stats.collapsed++;
+      // A brief slow motion for the big ones (skipped with reduced effects).
+      if (e.top > 35 && !this.settings.reduceFx) this.slowmo = 1.4;
     }
   }
 
@@ -362,7 +424,37 @@ class Game {
     const now = performance.now();
     if (now - this.lastHaptic < 90) return;
     this.lastHaptic = now;
-    try { navigator.vibrate(Math.round(ms)); } catch { /* not supported */ }
+    try { navigator.vibrate(Math.round(ms * (this.settings.vibrationLevel ?? 1))); } catch { /* not supported */ }
+  }
+
+  // Arrow toward the nearest objects of the right size when none is in view.
+  updateGuide(dt) {
+    const h = this.hole;
+    this.guideT -= dt;
+    if (this.guideT <= 0) {
+      this.guideT = 1.2;
+      this.guideTarget = null;
+      if (this.settings.guide && this.state === 'play') {
+        const view = this.rig.dist * 0.42, R = Math.min(400, this.rig.dist * 3 + 40);
+        const minNeed = h.r * 0.45;
+        let near = false, best = null, bd = Infinity;
+        this.world.forEachNear(h.x, h.z, R, e => {
+          if (near || e.state !== 'rest' || e.needR > h.r || e.needR < minNeed) return;
+          const d = Math.hypot(e.x - h.x, e.z - h.z);
+          if (d < view) { near = true; return; }
+          if (d < bd) { bd = d; best = e; }
+        });
+        if (!near && best) this.guideTarget = { x: best.x, z: best.z };
+      }
+    }
+    this.ui.setGuide(this.guideTarget ? this.guideAngle(this.guideTarget) : null);
+  }
+
+  guideAngle(t) {
+    _hp.set(t.x - ORIGIN.x, 0, t.z - ORIGIN.z).project(this.camera);
+    _hp2.set(this.hole.x - ORIGIN.x, this.hole.y, this.hole.z - ORIGIN.z).project(this.camera);
+    const dx = (_hp.x - _hp2.x) * window.innerWidth, dy = -(_hp.y - _hp2.y) * window.innerHeight;
+    return { angle: Math.atan2(dy, dx), cx: (_hp2.x * 0.5 + 0.5) * window.innerWidth, cy: (-_hp2.y * 0.5 + 0.5) * window.innerHeight };
   }
 
   // ---- main loop ------------------------------------------------------------
@@ -384,8 +476,13 @@ class Game {
     const sim = this.state !== 'pause';
     const hole = this.hole;
 
+    SHARED.uTime.value = this.time;
+    // Slow motion (big collapses) affects the world, not the player's hole.
+    const simDt = this.slowmo > 0 ? dt * 0.5 : dt;
+    this.slowmo = Math.max(0, this.slowmo - dt);
     if (playing) {
       this.save.stats.time += dt;
+      this.save.stats.distance = (this.save.stats.distance || 0) + Math.hypot(hole.vx, hole.vz) * dt;
       const inp = this.input.read();
       const yaw = this.rig.yaw;
       const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
@@ -422,11 +519,12 @@ class Game {
     this.world.update(dt, this.state === 'play' ? 5 : 8); lap('world');
 
     if (sim) {
-      this.traffic.update(dt); lap('traffic');
-      this.peds.update(dt); lap('peds');
-      this.physics.update(dt, hole); lap('physics');
-      this.fx.update(dt, hole, this.pxScale); lap('fx');
+      this.traffic.update(simDt); lap('traffic');
+      this.peds.update(simDt); lap('peds');
+      this.physics.update(simDt, hole); lap('physics');
+      this.fx.update(simDt, hole, this.pxScale); lap('fx');
     }
+    this.updateGuide(dt);
     this.rig.occlusion(dt, this.world, hole); lap('occlusion');
 
     const depth = this.holeVis.update(dt, hole.x - ORIGIN.x, hole.y, hole.z - ORIGIN.z, hole.r, hole.attract, this.pxScale);
@@ -435,8 +533,10 @@ class Game {
     // Sun and shadow frustum follow the camera target.
     const t = this.rig.target, d = this.rig.dist;
     const span = Math.min(420, Math.max(14, d * 0.95));
+    if (sim) this.daynight.update(dt, this.settings.dayNight);
+    const sd = this.daynight.dir;
     this.sunTarget.position.set(t.x - ORIGIN.x, 0, t.z - ORIGIN.z);
-    this.sun.position.set(t.x - ORIGIN.x - span * 0.9, span * 1.6, t.z - ORIGIN.z + span * 0.7);
+    this.sun.position.set(t.x - ORIGIN.x + sd.x * span * 2, sd.y * span * 2, t.z - ORIGIN.z + sd.z * span * 2);
     const sc = this.sun.shadow.camera;
     if (sc.right !== span) {
       sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span;
@@ -452,7 +552,8 @@ class Game {
 
     this.pools.lod(d, this.renderer.shadowMap.enabled);
     this.peds.lod(d, this.renderer.shadowMap.enabled);
-    this.pools.flush();
+    this.camera.updateMatrixWorld();
+    this.pools.flush(this.camera, Math.max(8, d * 0.25));
     this.world.flush();
     this.peds.flush();
     lap('update');
@@ -479,7 +580,7 @@ class Game {
   }
 }
 
-const _hp = new THREE.Vector3();
+const _hp = new THREE.Vector3(), _hp2 = new THREE.Vector3();
 
 function startGame() {
   let game;

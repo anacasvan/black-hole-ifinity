@@ -201,6 +201,14 @@ export class Peds {
     if (this.list.length < max && this.spawnT <= 0) { this.spawn(false); this.spawnT = 0.2; }
     const limit = (g.world.fullR + 0.7) * C;
     const danger = hole.r >= 0.55;
+    // Spatial grid (2 m cells) so pedestrians can make room for each other.
+    const grid = this.grid || (this.grid = new Map());
+    grid.clear();
+    for (const p of this.list) {
+      if (p.state !== 'rest') continue;
+      const k = `${Math.floor(p.x / 2)},${Math.floor(p.z / 2)}`;
+      let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(p);
+    }
     for (let n = this.list.length - 1; n >= 0; n--) {
       const p = this.list[n];
       if (p.state === 'gone') { this.list.splice(n, 1); continue; }
@@ -228,6 +236,27 @@ export class Peds {
     const running = p.mode === 'flee';
     let target = running ? 3.6 + p.speed * 0.6 : p.speed;
     if (p.mode === 'wait') target = 0;
+    else {
+      // Someone right ahead: step aside if they come towards us, slow down if they go our way.
+      const fx = Math.sin(p.rot), fz = Math.cos(p.rot);
+      const gx = Math.floor(p.x / 2), gz = Math.floor(p.z / 2);
+      for (let ix = gx - 1; ix <= gx + 1; ix++) for (let iz = gz - 1; iz <= gz + 1; iz++) {
+        const cell = this.grid.get(`${ix},${iz}`);
+        if (!cell) continue;
+        for (const q of cell) {
+          if (q === p) continue;
+          const dx = q.x - p.x, dz = q.z - p.z;
+          const ahead = dx * fx + dz * fz, side = Math.abs(dx * fz - dz * fx);
+          if (ahead <= 0 || ahead > 1.1 || side > 0.55) continue;
+          const facing = Math.sin(q.rot) * fx + Math.cos(q.rot) * fz;
+          if (facing < 0) { p.latT = 0.5; p.latHold = 1.2; }
+          else if (!running) target = Math.min(target, q.cur * 0.9);
+        }
+      }
+    }
+    p.latHold = Math.max(0, (p.latHold || 0) - dt);
+    if (p.latHold <= 0) p.latT = 0;
+    p.lat = (p.lat || 0) + ((p.latT || 0) - (p.lat || 0)) * Math.min(1, dt * 3);
     if (p.stress > 0) target *= Math.max(0.2, 1 - p.stress);
     p.cur += (target - p.cur) * Math.min(1, dt * (running ? 4 : 2.5));
     p.run += ((running ? 1 : 0) - p.run) * Math.min(1, dt * 4);
@@ -336,7 +365,9 @@ export class Peds {
       _q2.copy(p.getupFrom).slerp(_q, t * t * (3 - 2 * t));
       _q.copy(_q2);
     }
-    _p.set(p.x - ORIGIN.x, p.y, p.z - ORIGIN.z);
+    // Sidestep offset to the walker's right (keeps them on the sidewalk).
+    const lat = p.lat || 0;
+    _p.set(p.x - ORIGIN.x - Math.cos(p.rot) * lat, p.y, p.z - ORIGIN.z + Math.sin(p.rot) * lat);
     _root.compose(_p, _q, _s.set(p.s, p.s, p.s));
     this.skeleton(p, _root, {
       bob: Math.abs(Math.sin(ph)) * 0.035 * Math.min(1, p.cur),

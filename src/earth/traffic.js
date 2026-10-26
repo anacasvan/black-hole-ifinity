@@ -128,13 +128,14 @@ export class Traffic {
       if (alongZ) { hz = dir; if (dir < 0) j = ch.j + 1; } else { hx = dir; if (dir < 0) i = ch.i + 1; }
       const avenue = alongZ ? isAvenue(ch.i) : isAvenue(ch.j);
       const lanes = alongZ ? laneOffsets(ch.i).length : laneOffsets(ch.j).length;
-      const seg = lineSeg(i, j, hx, hz, Math.floor(Math.random() * lanes));
+      const kind = this.pickKind(avenue);
+      const seg = lineSeg(i, j, hx, hz, kind === 'bus' ? lanes - 1 : Math.floor(Math.random() * lanes));
       const u = Math.random() * seg.len;
       const pose = segPose(seg, u, {});
       if (this.cars.some(c => Math.hypot(c.x - pose.x, c.z - pose.z) < 12)) continue;
       if (Math.hypot(pose.x - this.g.hole.x, pose.z - this.g.hole.z) < this.g.hole.r * 3 + 6) continue;
       if (!initial && this.visible(pose.x, pose.z, 6)) continue;
-      this.add(this.pickKind(avenue), seg, u, pose);
+      this.add(kind, seg, u, pose);
       return true;
     }
     return false;
@@ -161,6 +162,7 @@ export class Traffic {
     car.onRelease = () => { car.vx = 0; car.vz = 0; };
     car.onSettle = () => !this.visible(car.body.p.x, car.body.p.z, 6);
     this.chooseNext(car);
+    this.findStop(car);
     this.cars.push(car);
     this.render(car, 0);
     return car;
@@ -177,12 +179,12 @@ export class Traffic {
       if (car.kind !== 'bus' && r < 0.22) h2 = [rx, rz];
       else if (car.kind !== 'bus' && r < 0.42) h2 = [-rx, -rz];
       const offs = lanesFor(i, j, h2[0]);
-      const laneOut = h2[0] === rx && h2[1] === rz ? offs.length - 1 : h2[0] === -rx && h2[1] === -rz ? 0 : seg.lane;
+      const laneOut = car.kind === 'bus' || (h2[0] === rx && h2[1] === rz) ? offs.length - 1 : h2[0] === -rx && h2[1] === -rz ? 0 : seg.lane;
       car.next = turnSeg(i, j, hx, hz, h2[0], h2[1], seg.lane, laneOut);
     } else {
       const [i, j] = seg.from;
       const [h2x, h2z] = seg.out;
-      car.next = lineSeg(i, j, h2x, h2z, seg.lane);
+      car.next = lineSeg(i, j, h2x, h2z, car.kind === 'bus' ? 9 : seg.lane);
     }
   }
 
@@ -253,6 +255,14 @@ export class Traffic {
         if (car.honkT <= 0) { car.honkT = 3 + Math.random() * 4; if (dh < hole.r * 3 + 6) this.g.audio?.honk(); }
       } else vDes = Math.max(vDes, car.cruise * 1.35);
     }
+    if (car.stopU != null) {
+      // Buses pull in at the stops on their route and wait a few seconds.
+      const ds = car.stopU - car.u;
+      if (ds > -0.5) {
+        vDes = Math.min(vDes, Math.sqrt(2 * 2 * Math.max(0, ds - 0.2)));
+        if (ds < 1.2 && car.speed < 0.4) { car.dwell = (car.dwell || 0) + dt; if (car.dwell > 5) { car.stopU = null; car.dwell = 0; } }
+      } else car.stopU = null;
+    }
     if (car.stress > 0) vDes *= Math.max(0, 1 - car.stress);
     const acc = vDes > car.speed ? 2.6 : -7;
     const prev = car.speed;
@@ -263,12 +273,27 @@ export class Traffic {
       car.u -= car.seg.len;
       car.seg = car.next;
       this.chooseNext(car);
+      this.findStop(car);
     }
     segPose(car.seg, car.u, this._pose);
     car.vx = this._pose.hx * car.speed; car.vz = this._pose.hz * car.speed;
     car.x = this._pose.x; car.z = this._pose.z;
     car.rot = Math.atan2(this._pose.hx, this._pose.hz);
     this.render(car, dt);
+  }
+
+  findStop(car) {
+    car.stopU = null;
+    const seg = car.seg;
+    if (car.kind !== 'bus' || seg.type !== 'line' || seg.cross) return;
+    const [rx, rz] = right(seg.hx, seg.hz);
+    const mx = (seg.p0[0] + seg.p1[0]) / 2, mz = (seg.p0[1] + seg.p1[1]) / 2;
+    this.g.world.forEachNear(mx, mz, seg.len / 2 + 6, e => {
+      if (e.kind !== 'busstop' || e.state !== 'rest') return;
+      const dx = e.x - seg.p0[0], dz = e.z - seg.p0[1];
+      const along = dx * seg.hx + dz * seg.hz, lat = dx * rx + dz * rz;
+      if (lat > 1.5 && lat < 6 && along > 4 && along < seg.len - 6) car.stopU = along;
+    });
   }
 
   render(car, dt) {

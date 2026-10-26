@@ -1,11 +1,13 @@
 // Instanced rendering pools: one InstancedMesh per model shared by the whole
 // world (all the model's materials are merged into a single "uber" material),
 // so thousands of objects cost a handful of draw calls.
+// Each pool keeps its instances in a CPU array (indexed by slot) and every
+// frame copies only the instances inside the (slightly enlarged) camera
+// frustum into the GPU buffer, so off-screen objects cost nothing to draw.
 import * as THREE from 'three';
 import { MODELS } from './models.js';
 import { mergeKeyed, OBJ_PRESET } from './materials.js';
 
-const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const NO_SHADOW = new Set(['leaf', 'litter0', 'litter1', 'litter2', 'litter3']);
 
 export class Pool {
@@ -17,10 +19,13 @@ export class Pool {
     this.capacity = capacity;
     this.free = [];
     this.top = 0;
-    this.dirty = false;
-    this.colorDirty = false;
     this.geo = mergeKeyed(model.parts.map(p => [p.mat, p.geo]), k => OBJ_PRESET[k]);
     model.parts = [];
+    const bs = this.geo.boundingSphere;
+    this.radius = bs.center.length() + bs.radius;
+    this.src = new Float32Array(capacity * 16);
+    this.srcCol = new Float32Array(capacity * 3).fill(1);
+    this.alive = new Uint8Array(capacity);
     this.meshes = [this.makeMesh(capacity)];
   }
   makeMesh(cap) {
@@ -37,15 +42,15 @@ export class Pool {
   }
   grow() {
     const cap = this.capacity * 2;
-    this.meshes = this.meshes.map(old => {
-      const m = this.makeMesh(cap);
-      m.instanceMatrix.array.set(old.instanceMatrix.array);
-      if (old.instanceColor) m.instanceColor.array.set(old.instanceColor.array);
-      m.count = old.count;
-      this.scene.remove(old);
-      old.dispose();
-      return m;
-    });
+    const src = new Float32Array(cap * 16); src.set(this.src); this.src = src;
+    const col = new Float32Array(cap * 3).fill(1); col.set(this.srcCol); this.srcCol = col;
+    const alive = new Uint8Array(cap); alive.set(this.alive); this.alive = alive;
+    const old = this.meshes[0];
+    const m = this.makeMesh(cap);
+    m.visible = old.visible; m.castShadow = old.castShadow;
+    this.scene.remove(old);
+    old.dispose();
+    this.meshes = [m];
     this.capacity = cap;
   }
   alloc() {
@@ -54,28 +59,44 @@ export class Pool {
     else {
       if (this.top >= this.capacity) this.grow();
       s = this.top++;
-      for (const m of this.meshes) m.count = this.top;
     }
+    this.alive[s] = 0;
     return s;
   }
-  release(s) {
-    for (const m of this.meshes) m.setMatrixAt(s, ZERO);
-    this.free.push(s);
-    this.dirty = true;
+  release(s) { this.alive[s] = 0; this.free.push(s); }
+  set(s, matrix) { matrix.toArray(this.src, s * 16); this.alive[s] = 1; }
+  color(s, c) { this.srcCol[s * 3] = c.r; this.srcCol[s * 3 + 1] = c.g; this.srcCol[s * 3 + 2] = c.b; }
+
+  // Copy the visible instances into the GPU buffers.
+  cull(planes, margin) {
+    const m = this.meshes[0];
+    if (!m.visible) { m.count = 0; return; }
+    const src = this.src, col = this.srcCol, dst = m.instanceMatrix.array, dcol = m.instanceColor.array;
+    const R = this.radius;
+    let k = 0;
+    for (let s = 0; s < this.top; s++) {
+      if (!this.alive[s]) continue;
+      const o = s * 16;
+      const sc = Math.sqrt(src[o] * src[o] + src[o + 1] * src[o + 1] + src[o + 2] * src[o + 2]) || Math.sqrt(src[o + 4] * src[o + 4] + src[o + 5] * src[o + 5] + src[o + 6] * src[o + 6]);
+      if (sc === 0) continue;
+      const x = src[o + 12], y = src[o + 13], z = src[o + 14], r = R * Math.max(1, sc) + margin;
+      let inside = true;
+      for (let p = 0; p < 6; p++) {
+        const pl = planes[p];
+        if (pl.normal.x * x + pl.normal.y * y + pl.normal.z * z + pl.constant < -r) { inside = false; break; }
+      }
+      if (!inside) continue;
+      dst.set(src.subarray(o, o + 16), k * 16);
+      dcol[k * 3] = col[s * 3]; dcol[k * 3 + 1] = col[s * 3 + 1]; dcol[k * 3 + 2] = col[s * 3 + 2];
+      k++;
+    }
+    m.count = k;
+    if (k) {
+      m.instanceMatrix.clearUpdateRanges(); m.instanceMatrix.addUpdateRange(0, k * 16); m.instanceMatrix.needsUpdate = true;
+      m.instanceColor.clearUpdateRanges(); m.instanceColor.addUpdateRange(0, k * 3); m.instanceColor.needsUpdate = true;
+    }
   }
-  set(s, matrix) {
-    for (const m of this.meshes) m.setMatrixAt(s, matrix);
-    this.dirty = true;
-  }
-  color(s, c) {
-    for (const m of this.meshes) if (m.instanceColor) m.setColorAt(s, c);
-    this.colorDirty = true;
-  }
-  flush() {
-    if (this.dirty) { for (const m of this.meshes) m.instanceMatrix.needsUpdate = true; this.dirty = false; }
-    if (this.colorDirty) { for (const m of this.meshes) if (m.instanceColor) m.instanceColor.needsUpdate = true; this.colorDirty = false; }
-  }
-  setShadows(on) { for (const m of this.meshes) m.castShadow = on && !NO_SHADOW.has(this.key); }
+  visibleCount() { return this.meshes[0].count; }
 }
 
 const LOD_LIMIT = { tiny: 70, small: 280, medium: 700, large: Infinity };
@@ -89,6 +110,7 @@ const LOD_CLASS = {
 };
 
 const CAPACITY = { leaf: 4096, litter0: 1024, litter1: 1024, litter2: 1024, litter3: 1024, wheel: 1024, fence: 1024 };
+const _frustum = new THREE.Frustum(), _pm = new THREE.Matrix4();
 
 export class Pools {
   constructor(scene, materials) {
@@ -106,8 +128,13 @@ export class Pools {
     }
     return p;
   }
-  flush() { for (const p of this.map.values()) p.flush(); }
-  setShadows(on) { for (const p of this.map.values()) p.setShadows(on); }
+
+  // margin: extra metres around the view so shadows of objects just outside it remain.
+  flush(camera, margin = 0) {
+    _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    _frustum.setFromProjectionMatrix(_pm);
+    for (const p of this.map.values()) p.cull(_frustum.planes, margin);
+  }
 
   // Distance LOD: objects that would be a few pixels wide are not drawn, and
   // small ones stop casting shadows.
@@ -121,8 +148,8 @@ export class Pools {
     }
   }
   stats() {
-    let instances = 0, meshes = 0;
-    for (const p of this.map.values()) { instances += p.top - p.free.length; meshes += p.meshes.length; }
-    return { pools: this.map.size, meshes, instances };
+    let instances = 0, visible = 0;
+    for (const p of this.map.values()) { instances += p.top - p.free.length; visible += p.visibleCount(); }
+    return { pools: this.map.size, meshes: this.map.size, instances, visible };
   }
 }

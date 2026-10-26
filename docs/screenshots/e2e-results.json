@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-26T14:32:05.126Z",
+  "date": "2026-10-26T16:11:36.363Z",
   "results": [
     {
       "name": "WebGL2 renderer available",
@@ -29,7 +29,7 @@
     {
       "name": "black hole is circular from above (small)",
       "pass": true,
-      "detail": "{\"area\":4895,\"w\":79,\"h\":80,\"aspect\":0.9875,\"fill\":0.9861562613099085,\"expectedDiameterPx\":85.33333333333333}"
+      "detail": "{\"area\":4898,\"w\":79,\"h\":80,\"aspect\":0.9875,\"fill\":0.9867606471697511,\"expectedDiameterPx\":85.33333333333333}"
     },
     {
       "name": "visible size matches physical radius",
@@ -39,7 +39,7 @@
     {
       "name": "vehicles drive on roads, pedestrians on sidewalks/crossings",
       "pass": true,
-      "detail": "{\"cars\":27,\"carsOff\":0,\"peds\":48,\"pedsOff\":0,\"stoppedAtRed\":7}"
+      "detail": "{\"cars\":27,\"carsOff\":0,\"peds\":48,\"pedsOff\":0,\"stoppedAtRed\":12}"
     },
     {
       "name": "no planets or spheres floating over the city",
@@ -59,7 +59,7 @@
     {
       "name": "joystick moves the hole",
       "pass": true,
-      "detail": "moved 2.19 m"
+      "detail": "moved 2.08 m"
     },
     {
       "name": "multitouch: move + ATTRAI together",
@@ -144,7 +144,7 @@
     {
       "name": "absorbing objects increases mass",
       "pass": true,
-      "detail": "mass 0.000 -> 0.241, eaten 7"
+      "detail": "mass 0.000 -> 0.765, eaten 9"
     },
     {
       "name": "radius grows with mass",
@@ -154,12 +154,12 @@
     {
       "name": "pedestrians flee (running) from a dangerous hole",
       "pass": true,
-      "detail": "{\"mode\":\"flee\",\"run\":0.9253996332420016,\"speed\":4.145123197848717}"
+      "detail": "{\"mode\":\"flee\",\"run\":0.8146869012630524,\"speed\":3.7998904982715995,\"state\":\"rest\"}"
     },
     {
       "name": "save restores progress after reload",
       "pass": true,
-      "detail": "mass 6.032, button \"Continua\""
+      "detail": "mass 6.084, button \"Continua\""
     },
     {
       "name": "settings (custom joystick) persist",
@@ -169,7 +169,7 @@
     {
       "name": "camera zooms out as the hole grows",
       "pass": true,
-      "detail": "camDist 85.7"
+      "detail": "camDist 86.1"
     },
     {
       "name": "a car gets dragged into the hole",
@@ -179,30 +179,50 @@
     {
       "name": "a building tilts, collapses and sinks into the hole",
       "pass": true,
-      "detail": "stress,collapse,collapse,collapse,collapse,collapse,collapse,collapse,gone,missing,missing,missing,missing,missing"
+      "detail": "stress,collapse,collapse,collapse,collapse,collapse,collapse,collapse,missing,missing,missing,missing,missing,missing"
     },
     {
       "name": "growth continues (no cap)",
       "pass": true,
-      "detail": "r=6.48"
+      "detail": "r=7.35"
     },
     {
       "name": "far areas stream in (floating origin rebased)",
       "pass": true,
-      "detail": "full 29, lite 396, origin v2, 4019 ms"
+      "detail": "full 28, lite 464, origin v2, 4349 ms"
     },
     {
       "name": "huge radius still grows",
       "pass": true,
-      "detail": "r=37.8"
+      "detail": "r=42.2"
     },
     {
       "name": "black hole is circular from above (huge)",
       "pass": true,
-      "detail": "{\"area\":5204,\"w\":82,\"h\":82,\"aspect\":1,\"fill\":0.9854162092209677,\"expectedDiameterPx\":85.33333333333333}"
+      "detail": "{\"area\":5107,\"w\":82,\"h\":82,\"aspect\":1,\"fill\":0.9670485358361803,\"expectedDiameterPx\":85.33333333333333}"
     },
     {
       "name": "camera keeps the hole centred",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "day/night cycle (night lights on, day off)",
+      "pass": true,
+      "detail": "night 1.00, day 0.00"
+    },
+    {
+      "name": "missions completed and per-type statistics recorded",
+      "pass": true,
+      "detail": "{\"done\":5,\"byKind\":26}"
+    },
+    {
+      "name": "off-screen instances are not drawn (frustum culling)",
+      "pass": true,
+      "detail": "{\"pools\":57,\"meshes\":57,\"instances\":6694,\"visible\":449}"
+    },
+    {
+      "name": "statistics screen",
       "pass": true,
       "detail": ""
     },

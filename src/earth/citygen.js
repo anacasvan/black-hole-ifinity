@@ -1,4 +1,4 @@
-﻿// Deterministic city layout. Each chunk (C x C metres) owns: the intersection at
+// Deterministic city layout. Each chunk (C x C metres) owns: the intersection at
 // its south-west corner, the road leg to the north of it (west road), the road
 // leg to the east of it (south road) and one urban block. Pure data, no three.js.
 
@@ -49,7 +49,7 @@ export function startPosition() {
 
 const PAL = {
   car: [0xd9d9d6, 0x1c1e22, 0x8d939b, 0xa8141d, 0x1b3f80, 0xf3f3f1, 0x4f5d41, 0x63686e, 0x2d5585, 0xbfa063, 0x721d29, 0x3a8cbc, 0xe8e2d0, 0x30353c],
-  plaster: [0xf1e3c8, 0xeacfb0, 0xf4d9a6, 0xe8c2a4, 0xe9e4da, 0xdcd4c6, 0xf0d6bd, 0xefe6c6, 0xdcc5a3, 0xf2dcc9, 0xd8dcd2],
+  plaster: [0xf1e3c8, 0xeacfb0, 0xf4d9a6, 0xe8c2a4, 0xe9e4da, 0xdcd4c6, 0xf0d6bd, 0xefe6c6, 0xdcc5a3, 0xf2dcc9, 0xd8dcd2, 0xe6b99a, 0xd9c9a8, 0xc9d3d6, 0xf3e7b5, 0xe2a98f],
   roof: [0xb4553a, 0xa64a33, 0xc06a48, 0x8e4634, 0x6e6a66],
   awning: [0x2f6d4f, 0xa8322d, 0x26466f, 0xd88a1e, 0x5b3a6e, 0x30302f, 0x7a4a2a],
   bin: [0x3d6b43, 0x5d6266, 0x2f5f8a, 0x7a5a32],
@@ -333,7 +333,7 @@ function palazzina(g, f) {
   const hv = 4.5 + d / 2;
   const [x, z] = f.at(0, hv);
   g.building('palazzina', x, z, w, d, f.rot, {
-    floors, h: floors * 3.0, col: r.pick(PAL.plaster), style: r.pick(['resB', 'resB', 'brick', 'resA']), balconies: r.chance(0.75),
+    floors, h: floors * 3.0, col: r.pick(PAL.plaster), style: r.pick(['resB', 'resC', 'brick', 'resA']), balconies: r.chance(0.75),
   });
   const back = hv + d / 2 + 1.2, end = f.D - 0.8;
   if (end - back >= 5.4) {
@@ -429,7 +429,7 @@ function palazzo(g, f, W, Dp, corner) {
   const [x, z] = f.at(0, Dp / 2);
   g.building('palazzo', x, z, W - 0.2, Dp - 0.2, f.rot, {
     floors, h: (shopGround ? 4.2 : 3.1) + (floors - 1) * 3.1, shopGround, corner,
-    col: r.pick(PAL.plaster), style: r.pick(['resA', 'resB', 'brick', 'resA']), roof: r.chance(0.5) ? 'hip' : 'flat',
+    col: r.pick(PAL.plaster), style: r.pick(['resA', 'resB', 'brick', 'resC', 'resA', 'resC']), roof: r.chance(0.5) ? 'hip' : 'flat',
     roofCol: r.pick(PAL.roof), sign: r.pick(SHOP_SIGNS), awning: r.pick(PAL.awning), balconies: r.chance(0.6),
   });
 }
@@ -538,7 +538,7 @@ function cbd(g) {
   g.decorRect('plaza', L.x0, L.z0, L.x1, L.z1);
   const side = r.pick(['S', 'N', 'E', 'W']);
   const f = g.frame(L, side);
-  const style = r.pick(['office', 'office', 'officeC']);
+  const style = r.pick(['office', 'officeD', 'officeC', 'office']);
   if (r.chance(0.5)) {
     const p = Math.min(28, f.W - 8);
     const [x, z] = f.at(0, f.D - p / 2 - 1.5);
@@ -659,5 +659,23 @@ export function generateChunk(i, j) {
   const g = new Gen(i, j);
   ZONES[g.zone](g);
   sidewalk(g);
+  // Start area: plenty of small things so the first minutes are rewarding.
+  // (Appended last so the indices of the other items never change.)
+  if (i === START_CHUNK[0] && j === START_CHUNK[1]) {
+    const s = startPosition(), r = rngFor(i, j, 555);
+    g.r = r;
+    for (let k = 0; k < 90; k++) {
+      const a = r() * Math.PI * 2, d = 1.2 + r() * 11;
+      const x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;
+      if (g.inLot(x, z, 0.2) && g.free(x, z, 0.1)) g.tiny(r.chance(0.6) ? 'leaf' : 'litter', x, z);
+    }
+    const ring = [['cone', 5, 4.5], ['bin', 3, 6.5], ['flowerpot', 3, 8], ['cone', 3, 10]];
+    for (const [kind, n, d0] of ring) {
+      for (let k = 0; k < n; k++) {
+        const a = r() * Math.PI * 2, d = d0 + r() * 1.5;
+        g.tryProp(kind, s.x + Math.cos(a) * d, s.z + Math.sin(a) * d, r() * 6.28, kind === 'bin' ? { col: PAL.bin[k % 3] } : { col: 0xb0643c }, 0.3);
+      }
+    }
+  }
   return { i, j, zone: g.zone, items: g.items, decor: g.decor, b: g.b, L: g.L };
 }

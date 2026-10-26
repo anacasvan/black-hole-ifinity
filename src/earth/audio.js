@@ -145,7 +145,7 @@ export class GameAudio {
     o.start(t); o.stop(t + 0.5);
   }
 
-  swallow(mass) {
+  swallow(mass, cat) {
     if (!this.ctx || this.pops > 10) return;
     this.pops++;
     const ctx = this.ctx, t = ctx.currentTime;
@@ -162,6 +162,41 @@ export class GameAudio {
     const ng = ctx.createGain(); ng.gain.setValueAtTime(vol * 0.5, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
     n.connect(bp); bp.connect(ng); ng.connect(this.sfxBus);
     n.start(t); n.stop(t + 0.3);
+    this.material(cat, vol, t);
+  }
+
+  // A short layer that tells what was swallowed: metal, leaves, glass, wood.
+  material(cat, vol, t) {
+    const ctx = this.ctx;
+    const env = (node, a, d, peak) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t + a); g.gain.linearRampToValueAtTime(peak, t + a + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+      node.connect(g); g.connect(this.sfxBus);
+      return g;
+    };
+    if (cat === 'vehicle') {
+      for (const f of [310, 470]) {
+        const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * (0.9 + Math.random() * 0.2);
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 3;
+        o.connect(bp); env(bp, 0.02, 0.16, vol * 0.25);
+        o.start(t); o.stop(t + 0.25);
+      }
+    } else if (cat === 'tree' || cat === 'tiny') {
+      const n = this.noiseSrc(false);
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = cat === 'tree' ? 1800 : 3500;
+      n.connect(hp); env(hp, 0, cat === 'tree' ? 0.45 : 0.12, vol * (cat === 'tree' ? 0.5 : 0.25));
+      n.start(t); n.stop(t + 0.5);
+    } else if (cat === 'building') {
+      for (let k = 0; k < 5; k++) {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 2200 + Math.random() * 2600;
+        env(o, 0.05 + k * 0.07 + Math.random() * 0.05, 0.25, 0.04);
+        o.start(t); o.stop(t + 1);
+      }
+    } else if (cat === 'prop') {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 180 + Math.random() * 120;
+      env(o, 0.01, 0.12, vol * 0.4);
+      o.start(t); o.stop(t + 0.2);
+    }
   }
 
   collapse(size) {

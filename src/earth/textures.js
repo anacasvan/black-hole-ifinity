@@ -194,6 +194,42 @@ function facadeRes(shutters, seed) {
   return tex(c);
 }
 
+// Residential module with a French window and a small wrought-iron balcony.
+function facadeFrench(seed) {
+  const [c, x] = canvas(256);
+  x.fillStyle = '#f0ebe2'; x.fillRect(0, 0, 256, 256);
+  noise(x, 256, 256, 14, seed);
+  const r = makeRng(seed + 3);
+  const W = 74, H = 170, X = (256 - W) / 2, Y = 40;
+  x.fillStyle = '#e2dccf'; x.fillRect(X - 10, Y - 12, W + 20, 12);
+  x.fillStyle = '#f8f6f1'; x.fillRect(X - 5, Y - 5, W + 10, H + 5);
+  windowPane(x, X, Y, W, H, r);
+  x.fillStyle = '#ebe6dc'; x.fillRect(X + W / 2 - 2, Y, 4, H);
+  x.fillStyle = '#a8662f';
+  x.fillRect(X - 34, Y - 2, 28, H + 2); x.fillRect(X + W + 6, Y - 2, 28, H + 2);
+  x.fillStyle = 'rgba(0,0,0,0.22)';
+  for (let k = 0; k < 18; k++) { x.fillRect(X - 34, Y + 4 + k * 9, 28, 2); x.fillRect(X + W + 6, Y + 4 + k * 9, 28, 2); }
+  x.strokeStyle = '#2b2b2c'; x.lineWidth = 3;
+  x.strokeRect(X - 14, Y + H - 58, W + 28, 58);
+  for (let k = 0; k <= 10; k++) { x.beginPath(); x.moveTo(X - 14 + k * (W + 28) / 10, Y + H - 58); x.lineTo(X - 14 + k * (W + 28) / 10, Y + H); x.stroke(); }
+  x.fillStyle = '#cfc8ba'; x.fillRect(X - 18, Y + H, W + 36, 8);
+  return tex(c);
+}
+
+// Dark glass office module with vertical aluminium fins.
+function facadeOfficeDark(seed) {
+  const [c, x] = canvas(256);
+  const g = x.createLinearGradient(0, 0, 256, 256);
+  g.addColorStop(0, '#5f7482'); g.addColorStop(0.5, '#2c3a44'); g.addColorStop(1, '#1d2830');
+  x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  const r = makeRng(seed);
+  for (let k = 0; k < 4; k++) if (r() < 0.5) { x.fillStyle = `rgba(200,220,230,${0.06 + r() * 0.1})`; x.fillRect(k * 64 + 4, 0, 56, 256); }
+  x.fillStyle = '#9aa4aa';
+  for (let k = 0; k < 4; k++) x.fillRect(k * 64 - 5, 0, 10, 256);
+  x.fillStyle = '#121a20'; x.fillRect(0, 230, 256, 26);
+  return tex(c);
+}
+
 function facadeBrick(seed) {
   const [c, x] = canvas(256);
   x.fillStyle = '#8d4a36'; x.fillRect(0, 0, 256, 256);
@@ -362,6 +398,7 @@ export function makeTextures(renderer) {
     resA: facadeRes(true, 101), resB: facadeRes(false, 111), brick: facadeBrick(121),
     office: facadeOffice(131), officeC: facadeOfficeConcrete(141), shop: storefront(151),
     panel: panel(161), metal: corrugated(171), roofG: roofGravel(), roofT: roofTiles(), sign: signAtlas(),
+    resC: facadeFrench(181), officeD: facadeOfficeDark(191),
   };
   const B = 256;
   const bcell = (img, cx, cy, cw = 1, ch = 1) => ({ img, px: cx * B, py: cy * B, pw: cw * B, ph: ch * B });
@@ -369,6 +406,7 @@ export function makeTextures(renderer) {
     resA: bcell(t.resA.image, 0, 0), resB: bcell(t.resB.image, 1, 0), brick: bcell(t.brick.image, 2, 0), office: bcell(t.office.image, 3, 0),
     officeC: bcell(t.officeC.image, 4, 0), shop: bcell(t.shop.image, 5, 0), panel: bcell(t.panel.image, 6, 0), metal: bcell(t.metal.image, 7, 0),
     roofG: bcell(t.roofG.image, 0, 1), roofT: bcell(t.roofT.image, 1, 1), white: bcell(null, 2, 1), water: bcell(t.water.image, 3, 1),
+    resC: bcell(t.resC.image, 4, 1), officeD: bcell(t.officeD.image, 5, 1),
     sign: { img: t.sign.image, px: 0, py: 512, pw: 1024, ph: 512 },
   });
   const G = 512;

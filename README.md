@@ -38,6 +38,25 @@ Prima di pubblicare sostituisci l'`appId` provvisorio `com.example.blackholeinfi
 
 Il multitouch è sempre attivo: ci si muove e si attrae contemporaneamente.
 
+## Novità v1.1
+
+- **Primi minuti più gratificanti.** Ci sono più foglie, rifiuti, coni, cestini e vasi attorno al punto di partenza. All'inizio la crescita è circa 2,5 volte più rapida, poi scende fino al ritmo normale, che riprende a 0,8 m di raggio.
+- **Missioni facoltative.** Sono 23 obiettivi in ordine di taglia, da "15 foglie" a "100 edifici". Ogni missione completata dà una piccola spinta verso il livello successivo. Il traguardo in corso compare per qualche secondo quando avanza; l'elenco completo è nel menu di pausa. Si possono disattivare.
+- **Freccia guida.** Indica gli oggetti della tua taglia quando nell'inquadratura non ce ne sono. Si può disattivare.
+- **Crolli più spettacolari.** Pezzi che si staccano dai piani alti, schegge di vetro dai grattacieli e un breve rallentatore sugli edifici più alti di 35 m. Il rallentatore è escluso con "Riduci effetti".
+- **Ciclo giorno/notte** di 16 minuti: alba, tramonto e notte con finestre accese, lampioni, fari e insegne luminose. L'ora del giorno viene salvata. Si può disattivare.
+- **Città più varia.** Due nuove facciate (porte-finestre con balconcino, vetro scuro con lamelle verticali) e più colori di intonaco. Chiome e siepi si muovono con il vento. Oltre la zona caricata, il terreno mostra tetti stilizzati.
+- **Pedoni** che si scansano quando si incrociano e rallentano dietro chi va piano.
+- **Oggetti trascinati** che si urtano tra loro. Quelli spostati e poi abbandonati restano dove sono, anche dopo il riavvio.
+- **Autobus** che viaggiano sulla corsia esterna e si fermano alle pensiline per qualche secondo.
+- **Suoni diversi per materiale:** metallo per i veicoli, fruscio per gli alberi, vetro per gli edifici, legno e metallo per l'arredo urbano. Quando inghiotti qualcosa il bordo si illumina.
+- **Statistiche** dal menu e dalla pausa: tempo di gioco, massa e raggio massimo, oggetti, edifici crollati, distanza percorsa, missioni e oggetti più inghiottiti.
+- **Accessibilità:** dimensione dell'interfaccia regolabile e intensità della vibrazione.
+- **Prestazioni:**
+  - **Culling per oggetto:** gli oggetti fuori dall'inquadratura non vengono più disegnati. Nei test i triangoli scendono da 1,8 M a 0,22 M all'inizio del gioco e da 1,9 M a 0,53 M alla taglia delle auto.
+  - **Caricamento a pezzi:** le zone dettagliate si costruiscono un pezzo alla volta: terreno, oggetti a gruppi di 150, edifici a gruppi di 3.
+  - **Città lontana più estesa** con qualità Media e Alta.
+
 ## Cosa è implementato
 
 **Città.** La città è infinita e deterministica, divisa in settori da 64 m. Ogni settore ha un incrocio, due tratti di strada e un isolato. Ci sono cinque zone:
@@ -106,9 +125,9 @@ Lungo i marciapiedi ci sono lampioni, semafori, panchine, cestini, idranti, cart
 
 ## Test eseguiti (reali)
 
-`npm test` lancia i test di logica in Node: generazione della città su 17×17 settori e curva di crescita. **306.411 controlli superati.**
+`npm test` lancia i test di logica in Node: generazione della città su 17×17 settori e curva di crescita. **306.566 controlli superati**, comprese le missioni.
 
-`npm run test:e2e` esegue un test end-to-end in Microsoft Edge headless con GPU, viewport 390×844 portrait e input touch reali via CDP. **43/43 superati.** Ogni esecuzione salva gli screenshot e `e2e-results.json` in `docs/screenshots/`.
+`npm run test:e2e` esegue un test end-to-end in Microsoft Edge headless con GPU, viewport 390×844 portrait e input touch reali via CDP. **47/47 superati.** Ogni esecuzione salva gli screenshot e `e2e-results.json` in `docs/screenshots/`.
 
 | Verifica | Esito |
 | --- | --- |
@@ -131,9 +150,9 @@ Misure nella scena più pesante (buco da 38 m), sulla GPU desktop di questa macc
 
 A raggio 2,8 m, attraversando la città con ATTRAI premuto, il frame time è:
 
-- p50 ≈ 17–20 ms;
-- p99 ≈ 22–44 ms;
-- qualche picco isolato fino a ~120 ms durante il caricamento dei settori.
+- p50 ≈ 17 ms;
+- p99 ≈ 25 ms (prima della v1.1 era 44 ms);
+- un solo frame oltre i 50 ms su ~690, durante il caricamento dei settori.
 
 La parte CPU di ogni frame resta sotto i 10 ms (profilo per sezione in `window.__bhi.prof()`), quindi i picchi vengono dal caricamento dei dati sulla GPU o dal browser.
 
@@ -148,8 +167,9 @@ La parte CPU di ogni frame resta sotto i 10 ms (profilo per sezione in `window._
 ## Limiti noti e prossimi passi
 
 - **Asset 3D:** i modelli sono procedurali, semi-realistici e stilizzati, non asset artistici professionali. Il prossimo salto di qualità visiva è sostituirli con modelli glTF con licenza compatibile (CC0 o acquistati), mantenendo gli stessi nomi di modello in `src/earth/models.js`.
-- **Pedoni:** non si evitano tra loro dinamicamente. Camminano su corsie diverse del marciapiede e si fermano per i veicoli, e viceversa.
-- **Collisioni:** i corpi liberi collidono con terreno, gradini del marciapiede e pareti del pozzo, ma non tra loro. Un oggetto spostato e poi abbandonato torna al suo posto originale se il settore viene scaricato e ricaricato.
+- **Pedoni:** si scansano solo con una manovra semplice (passo laterale o rallentamento), non con una vera navigazione tra la folla.
+- **Collisioni:** tra gli oggetti trascinati sono semplificate a cilindri verticali.
+- **Notte:** i negozi restano bui; si accendono solo finestre, lampioni, fari e insegne. Le auto non parcheggiano.
 - **Vibrazione su iOS:** Safari non supporta la Vibration API. Nell'app nativa si può aggiungere il plugin `@capacitor/haptics`.
 - **Scala estrema:** oltre ~50 m di raggio la città lontana è resa in forma semplificata. Il passo successivo è un'ulteriore rappresentazione "macro" (quartieri o città interi).
 

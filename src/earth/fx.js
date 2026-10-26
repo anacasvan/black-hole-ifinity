@@ -32,7 +32,7 @@ export class FX {
     for (let k = 0; k < this.N; k++) this.dustP.push({ life: 0 });
     this.di = 0;
 
-    this.M = 160;
+    this.M = 260;
     this.deb = [];
     const bg = new THREE.BoxGeometry(1, 1, 1);
     const col = new Float32Array(bg.attributes.position.count * 3).fill(1);

@@ -5,13 +5,13 @@ import * as THREE from 'three';
 
 const RIM_VS = `varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
 const RIM_FS = `
-varying vec2 vP; uniform float uTime, uAttract, uReduce;
+varying vec2 vP; uniform float uTime, uAttract, uReduce, uPulse;
 void main(){
   float d = length(vP);
   float ang = atan(vP.y, vP.x);
   float shadow = (1.0 - smoothstep(1.0, 1.55, d)) * 0.62;
   float edge = 1.0 - smoothstep(1.0, 1.035, d);
-  float glow = exp(-pow((d - 1.045) * 16.0, 2.0)) * (0.5 + 0.5 * uAttract);
+  float glow = exp(-pow((d - 1.045) * 16.0, 2.0)) * (0.5 + 0.5 * uAttract + 1.2 * uPulse);
   float sw = 0.5 + 0.5 * sin(ang * 6.0 + d * 10.0 - uTime * (1.2 + uAttract * 4.5));
   float halo = (1.0 - smoothstep(1.05, 2.7, d)) * (0.04 + 0.16 * uAttract) * (0.5 + 0.5 * sw) * (1.0 - uReduce * 0.7);
   vec3 col = vec3(0.62, 0.68, 1.0) * (glow * 0.9 + halo);
@@ -74,7 +74,7 @@ export class HoleVisual {
       m.stencilFail = m.stencilZFail = m.stencilZPass = THREE.KeepStencilOp;
       return m;
     };
-    this.uni = { uTime: { value: 0 }, uAttract: { value: 0 }, uReduce: { value: 0 } };
+    this.uni = { uTime: { value: 0 }, uAttract: { value: 0 }, uReduce: { value: 0 }, uPulse: { value: 0 } };
     const wellGeo = new THREE.CylinderGeometry(1, 0.5, 1, 96, 6, true).translate(0, -0.5, 0);
     this.well = new THREE.Mesh(wellGeo, inside(new THREE.ShaderMaterial({ vertexShader: WELL_VS, fragmentShader: WELL_FS, uniforms: this.uni, side: THREE.BackSide })));
     this.well.renderOrder = -3;
@@ -119,8 +119,12 @@ export class HoleVisual {
     this.uni.uReduce.value = reduce ? 1 : 0;
   }
 
+  // Brief brightening of the rim when something is swallowed.
+  pulse(a) { this.uni.uPulse.value = Math.min(1.5, this.uni.uPulse.value + a); }
+
   update(dt, rx, y, rz, r, attracting, pxScale) {
     this.time += dt;
+    this.uni.uPulse.value *= Math.exp(-dt * 5);
     this.uni.uTime.value = this.time;
     this.attract += ((attracting ? 1 : 0) - this.attract) * (1 - Math.exp(-dt * 6));
     this.uni.uAttract.value = this.attract;

@@ -129,3 +129,22 @@ body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neu
   .menu-buttons { flex-direction: row; }
   .menu-hint { display: none; }
 }
+
+/* Missions, guide arrow, stats ---------------------------------------------- */
+.hud-top, .toast, .mission, .panel, .menu-inner { zoom: var(--ui, 1); }
+.mission { position: absolute; left: 50%; top: calc(var(--safe-t) + 70px); transform: translate(-50%, -6px); opacity: 0; display: flex; gap: 10px; align-items: center; background: var(--glass); border: 1px solid var(--line); border-radius: 12px; padding: 6px 12px; font-size: 12.5px; color: var(--muted); white-space: nowrap; max-width: calc(100vw - 40px); transition: opacity .4s ease, transform .4s ease; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.mission span { overflow: hidden; text-overflow: ellipsis; }
+.mission b { color: var(--text); font-variant-numeric: tabular-nums; }
+.mission.show { opacity: 1; transform: translate(-50%, 0); }
+.toast { top: calc(var(--safe-t) + 112px); }
+.guide { position: absolute; left: 0; top: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(159,176,255,.28); border: 1px solid rgba(201,184,255,.7); opacity: 0; transition: opacity .35s ease; box-shadow: 0 0 14px rgba(159,176,255,.45); }
+.guide.show { opacity: .9; }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { flex: 1; }
+.missions { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.missions li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.missions li b { color: var(--accent); font-variant-numeric: tabular-nums; }
+#pause-missions h3, .stats-body h3 { margin: 6px 0 8px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); font-size: 12.5px; margin: 0 0 6px; }
+.stats-body { max-height: 60vh; overflow-y: auto; touch-action: pan-y; }
+.panel.small { max-height: 100%; overflow-y: auto; }

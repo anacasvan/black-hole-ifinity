@@ -19,7 +19,8 @@ export class UI {
       hud: $('hud'), controls: $('controls'), menu: $('menu'), pause: $('pause'), settings: $('settings'),
       editor: $('joy-editor'), confirm: $('confirm'), loading: $('loading'), fatal: $('fatal'),
       mass: $('mass-value'), massPill: $('mass-pill'), next: $('next-name'), fill: $('progress-fill'), toast: $('toast'),
-      play: $('btn-play'), pauseStats: $('pause-stats'),
+      play: $('btn-play'), pauseStats: $('pause-stats'), pauseMissions: $('pause-missions'), stats: $('stats'), statsBody: $('stats-body'),
+      mission: $('mission'), missionText: $('mission-text'), missionCount: $('mission-count'), guide: $('guide'),
     };
     this.settingsFrom = 'menu';
     this.toastT = 0;
@@ -46,6 +47,9 @@ export class UI {
     this.click('btn-reset-settings', () => { g.applySettings({ ...DEFAULT_SETTINGS }); this.syncSettings(); });
     this.click('btn-edit-joy', () => this.openEditor());
     this.click('btn-editor-done', () => this.closeEditor());
+    this.click('btn-stats', () => this.openStats());
+    this.click('btn-pause-stats', () => this.openStats());
+    this.click('btn-stats-close', () => this.show('stats', false));
 
     const seg = (id, key) => {
       $(id).addEventListener('click', e => {
@@ -61,7 +65,9 @@ export class UI {
     seg('seg-attract', 'attractMode');
     const range = (id, key) => $(id).addEventListener('input', e => g.applySettings({ ...g.settings, [key]: Number(e.target.value) }));
     range('in-joysize', 'joySize'); range('in-joyopacity', 'joyOpacity'); range('in-sens', 'sensitivity');
-    range('in-music', 'music'); range('in-sfx', 'sfx');
+    range('in-music', 'music'); range('in-sfx', 'sfx'); range('in-uiscale', 'uiScale'); range('in-vibelevel', 'vibrationLevel');
+    const toggle = (id, key) => $(id).addEventListener('change', e => g.applySettings({ ...g.settings, [key]: e.target.checked }));
+    toggle('in-guide', 'guide'); toggle('in-missions', 'missions'); toggle('in-daynight', 'dayNight');
     $('in-vibe').addEventListener('change', e => g.applySettings({ ...g.settings, vibration: e.target.checked }));
     $('in-reduce').addEventListener('change', e => g.applySettings({ ...g.settings, reduceFx: e.target.checked }));
 
@@ -91,8 +97,9 @@ export class UI {
 
   showGame() { this.show('menu', false); this.show('pause', false); this.show('hud', true); this.show('controls', true); }
 
-  showPause(stats) {
+  showPause(stats, missions = '') {
     this.el.pauseStats.innerHTML = stats;
+    this.el.pauseMissions.innerHTML = missions;
     this.show('pause', true);
   }
 
@@ -116,6 +123,8 @@ export class UI {
     $('in-joysize').value = s.joySize; $('in-joyopacity').value = s.joyOpacity; $('in-sens').value = s.sensitivity;
     $('in-music').value = s.music; $('in-sfx').value = s.sfx;
     $('in-vibe').checked = s.vibration; $('in-reduce').checked = s.reduceFx;
+    $('in-uiscale').value = s.uiScale; $('in-vibelevel').value = s.vibrationLevel;
+    $('in-guide').checked = s.guide; $('in-missions').checked = s.missions; $('in-daynight').checked = s.dayNight;
     $('btn-edit-joy').disabled = s.control !== 'C';
     $('btn-edit-joy').textContent = s.control === 'C' ? 'Posiziona il joystick…' : 'Posiziona joystick (solo Personalizzato)';
   }
@@ -147,6 +156,33 @@ export class UI {
     this.el.fill.style.width = `${(info.progress * 100).toFixed(1)}%`;
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.el.toast.classList.remove('show'); }
     if (this.pulseT > 0) { this.pulseT -= dt; if (this.pulseT <= 0) this.el.massPill.classList.remove('pulse'); }
+    if (this.missionT > 0) { this.missionT -= dt; if (this.missionT <= 0) this.el.mission.classList.remove('show'); }
+  }
+
+  openStats() {
+    this.el.statsBody.innerHTML = this.g.statsHTML();
+    this.show('stats', true);
+  }
+
+  // Current mission, shown for a few seconds when it progresses.
+  setMission(m, changed) {
+    const el = this.el.mission;
+    if (!m) { el.classList.remove('show'); this.missionKey = null; return; }
+    const key = `${m.id}:${m.have}`;
+    if (key === this.missionKey) return;
+    this.missionKey = key;
+    this.el.missionText.textContent = m.text;
+    this.el.missionCount.textContent = `${m.have}/${m.n}`;
+    if (changed) { el.classList.add('show'); this.missionT = 4.5; }
+  }
+
+  setGuide(g) {
+    const el = this.el.guide;
+    if (!g) { el.classList.remove('show'); return; }
+    const R = Math.min(window.innerWidth, window.innerHeight) * 0.3;
+    const x = g.cx + Math.cos(g.angle) * R, y = g.cy + Math.sin(g.angle) * R;
+    el.style.transform = `translate(${x - 19}px, ${y - 19}px) rotate(${g.angle}rad)`;
+    el.classList.add('show');
   }
 
   pulse() { this.el.massPill.classList.add('pulse'); this.pulseT = 0.16; }

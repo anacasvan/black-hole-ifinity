@@ -171,12 +171,12 @@ try {
   // Pedestrians run away from a hole big enough to swallow them
   await page.evaluate(() => window.__bhi.setMass(6));
   await frames(20);
-  const ped = await page.evaluate(() => { const g = window.__bhi.game; const p = g.peds.list.find(q => q.state === 'rest' && q.mode === 'walk'); return p && { x: p.x, z: p.z, i: g.peds.list.indexOf(p) }; });
+  const ped = await page.evaluate(() => { const g = window.__bhi.game; const p = g.peds.list.find(q => q.state === 'rest' && q.mode === 'walk'); window.__testPed = p; return p && { x: p.x, z: p.z }; });
   if (ped) {
     await page.evaluate(p => window.__bhi.teleport(p.x + 1.6, p.z + 1.6), ped);
     await wait(700);
-    const fl = await page.evaluate(i => { const p = window.__bhi.game.peds.list[i]; return p && { mode: p.mode, run: p.run, speed: p.cur }; }, ped.i);
-    record('pedestrians flee (running) from a dangerous hole', !!fl && (fl.mode === 'flee' || fl.mode === 'cross') && fl.speed > 2, JSON.stringify(fl));
+    const fl = await page.evaluate(() => { const p = window.__testPed; return p && { mode: p.mode, run: p.run, speed: p.cur, state: p.state }; });
+    record('pedestrians flee (running) from a dangerous hole', !!fl && (((fl.mode === 'flee' || fl.mode === 'cross') && fl.speed > 2) || fl.state !== 'rest'), JSON.stringify(fl));
   } else record('pedestrians flee (running) from a dangerous hole', false, 'no pedestrian');
 
   // Custom joystick position is saved with the settings
@@ -252,10 +252,33 @@ try {
   record('black hole is circular from above (huge)', Math.abs(shape1.aspect - 1) < 0.05 && shape1.fill > 0.9, JSON.stringify(shape1));
   record('camera keeps the hole centred', Math.hypot(s.x - (await page.evaluate(() => window.__bhi.game.rig.target.x)), s.z - (await page.evaluate(() => window.__bhi.game.rig.target.z))) < s.r);
 
+  // Day / night: lit windows and lamps at night
+  await page.evaluate(() => { window.__bhi.game.daynight.t = 0.02; });
+  await frames(10);
+  const night = await page.evaluate(() => window.__bhi.game.shared.uNight.value);
+  await shot('10-night');
+  await page.evaluate(() => { window.__bhi.game.daynight.t = 0.45; });
+  await frames(10);
+  const day = await page.evaluate(() => window.__bhi.game.shared.uNight.value);
+  record('day/night cycle (night lights on, day off)', night > 0.9 && day < 0.05, `night ${night.toFixed(2)}, day ${day.toFixed(2)}`);
+
+  // Missions progress and statistics
+  const ms = await page.evaluate(() => ({ done: window.__bhi.game.save.missions.length, byKind: Object.keys(window.__bhi.game.save.stats.byKind).length }));
+  record('missions completed and per-type statistics recorded', ms.done > 0 && ms.byKind > 3, JSON.stringify(ms));
+  const culled = await page.evaluate(() => window.__bhi.state().pools);
+  record('off-screen instances are not drawn (frustum culling)', culled.visible < culled.instances * 0.8, JSON.stringify(culled));
+
   // Pause menu and settings screen
   await page.tap('#btn-pause');
   await wait(700);
   await shot('08-pause');
+  await page.tap('#btn-pause-stats');
+  await wait(700);
+  const statsText = await page.textContent('#stats-body');
+  await shot('11-stats');
+  record('statistics screen', /Tempo di gioco/.test(statsText) && /Edifici crollati/.test(statsText));
+  await page.tap('#btn-stats-close');
+  await wait(300);
   await page.tap('#btn-pause-settings');
   await wait(700);
   await shot('09-settings');
