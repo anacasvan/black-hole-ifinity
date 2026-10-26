@@ -90,7 +90,9 @@ for (let n = 2; n <= 10; n++) {
   ok(act[0].have === 15, 'progress is capped at the goal');
   act = activeMissions(['leaf15', 'litter10'], {}, 0);
   ok(act.every(m => m.tier <= 2), 'missions beyond the next tier are not proposed');
-  ok(missionReward(0) > 0 && missionReward(1e6) > missionReward(10), 'reward grows with scale');
+  ok(missionReward(0, MISSIONS[0]) > 0 && missionReward(1e6, MISSIONS[20]) > missionReward(10, MISSIONS[0]), 'reward grows with the mission tier');
+  ok(missionReward(5e7, MISSIONS[0]) < 1, 'an early mission completed late gives only a tiny reward');
+  ok(missionReward(100, MISSIONS[20]) <= 3, 'reward never exceeds 3% of the current mass');
   ok(earlyBoost(0.3) > 2 && earlyBoost(0.9) === 1, 'early boost only at the start');
 }
 

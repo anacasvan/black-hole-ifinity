@@ -2,7 +2,8 @@
 // away, and an infinite procedural ground plane beyond. Keeps the registry of
 // static entities (props, parked vehicles, buildings) and their eaten state.
 import * as THREE from 'three';
-import { C, generateChunk, chunkKey, blockBounds, roadWidth, isAvenue, CURB, SIDEWALK } from './citygen.js';
+import { C, generateChunk, chunkKey, blockBounds, roadWidth, isAvenue, CURB, SIDEWALK, zoneOf } from './citygen.js';
+import { hash2 } from './rng.js';
 import { KINDS } from './config.js';
 import { buildBuilding, liteColor } from './buildings.js';
 import { modelKey } from './models.js';
@@ -81,6 +82,11 @@ export class World {
     this.liteGroundPool = makeSimplePool(this.scene, new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), gm, 1024);
     this.liteGroundPool.mesh.castShadow = false;
     this.liteGroundPool.mesh.renderOrder = -4;
+    // Very far away (huge hole): a cheap skyline, a few boxes per block chosen
+    // from the zone, so the horizon never looks like a flat map.
+    this.macroPool = makeSimplePool(this.scene, boxGeo, m, 4096);
+    this.macroPool.mesh.castShadow = false;
+    this.macroKey = '';
   }
 
   makeGroundPlane() {
@@ -618,6 +624,50 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
     }
   }
 
+  updateMacro(camDist) {
+    const [ci, cj] = this.center;
+    const inner = this.liteR + 0.5;
+    const outer = camDist < 500 ? 0 : Math.min(40, Math.ceil((camDist * 2.2) / C));
+    const key = `${ci},${cj},${this.liteR},${outer},${ORIGIN.version}`;
+    if (key === this.macroKey) return;
+    this.macroKey = key;
+    const P = this.macroPool;
+    P.free.length = 0; P.top = 0;
+    if (outer <= inner) { P.mesh.count = 0; return; }
+    const M = _m, col = _c;
+    const put = (x, z, w, d, h, c) => {
+      const s = P.alloc();
+      M.makeScale(w, h, d).setPosition(x - ORIGIN.x, CURB, z - ORIGIN.z);
+      P.set(s, M);
+      P.color(s, col.set(c));
+    };
+    for (let i = ci - outer; i <= ci + outer; i++) for (let j = cj - outer; j <= cj + outer; j++) {
+      const dd = Math.hypot(i - ci, j - cj);
+      if (dd <= inner || dd > outer) continue;
+      const k = chunkKey(i, j);
+      if (this.g.save.eaten.get(k)?.size) continue; // already swallowed: leave it empty
+      const zone = zoneOf(i, j);
+      if (zone === 'park') continue;
+      const b = blockBounds(i, j);
+      const x0 = b.x0 + SIDEWALK + 1, x1 = b.x1 - SIDEWALK - 1, z0 = b.z0 + SIDEWALK + 1, z1 = b.z1 - SIDEWALK - 1;
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, W = x1 - x0, D = z1 - z0;
+      const hsh = q => hash2(i, j, q);
+      if (zone === 'cbd') {
+        put(cx, cz, W * 0.55, D * 0.55, 60 + hsh(1) * 100, hsh(2) < 0.5 ? 0x7fa3b8 : 0x3e4c56);
+      } else if (zone === 'commercial') {
+        put(cx, cz + D * 0.2, W * 0.8, D * 0.5, 8 + hsh(1) * 2, 0xe4e2dc);
+      } else {
+        const tall = zone === 'downtown';
+        for (let q = 0; q < 4; q++) {
+          const qx = q % 2 ? 0.25 : -0.25, qz = q < 2 ? -0.25 : 0.25;
+          const h = tall ? 14 + hsh(q + 3) * 12 : 6 + hsh(q + 3) * 4;
+          put(cx + qx * W, cz + qz * D, W * 0.36, D * 0.36, h, tall ? 0xe8d6bc : hsh(q + 9) < 0.5 ? 0xe9d9c0 : 0xd9c3a7);
+        }
+      }
+    }
+    P.mesh.count = P.top;
+  }
+
   updatePlane(cx, cz, size) {
     const snap = C;
     const px = Math.round(cx / snap) * snap, pz = Math.round(cz / snap) * snap;
@@ -626,7 +676,7 @@ bool bhAve(float k) { float m = mod(k, 4.0); return m < 0.5 || (k >= -1.0 && k <
     this.planeUniforms.uOriginK.value.set(ORIGIN.x / C, ORIGIN.z / C);
   }
 
-  flush() { this.litePool.flush(); this.liteTreePool.flush(); this.liteGroundPool.flush(); }
+  flush() { this.litePool.flush(); this.liteTreePool.flush(); this.liteGroundPool.flush(); this.macroPool.flush(); }
 
   stats() {
     let full = 0, lite = 0, ents = 0;

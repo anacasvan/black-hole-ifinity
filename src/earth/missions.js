@@ -1,6 +1,6 @@
 // Optional goals that give direction without pressure (no timers, no failure).
 // Pure JS (testable in Node).
-import { KINDS, massForRadius, progressInfo } from './config.js';
+import { KINDS, massForRadius, progressInfo, tier } from './config.js';
 
 const CARS = ['car_city', 'car_sedan', 'car_suv'];
 const TREES = ['tree', 'tree_small', 'tree_pine', 'tree_cypress', 'tree_birch'];
@@ -53,11 +53,13 @@ export function activeMissions(done, byKind, mass, max = 3) {
   return out;
 }
 
-// Reward: a small push toward the next tier (8% of the mass the tier needs).
-export function missionReward(mass) {
-  const p = progressInfo(mass);
-  const span = massForRadius(p.next.r) - (p.current.index === 1 ? 0 : massForRadius(p.current.r));
-  return Math.max(0.05, span * 0.08);
+// Reward: a small push sized on the mission's own tier (8% of that tier's mass
+// span), never more than 3% of the current mass, so easy early missions
+// completed late cannot inflate a big hole.
+export function missionReward(mass, mission) {
+  const t = mission?.tier ?? progressInfo(mass).current.index;
+  const span = massForRadius(tier(t + 1).r) - (t === 1 ? 0 : massForRadius(tier(t).r));
+  return Math.max(0.05, Math.min(span * 0.08, Math.max(0.05, mass * 0.03)));
 }
 
 // Early boost: the first minutes are faster, then the normal slow pace.

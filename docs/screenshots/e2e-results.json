@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-26T16:11:36.363Z",
+  "date": "2026-10-26T16:38:18.828Z",
   "results": [
     {
       "name": "WebGL2 renderer available",
@@ -29,7 +29,7 @@
     {
       "name": "black hole is circular from above (small)",
       "pass": true,
-      "detail": "{\"area\":4898,\"w\":79,\"h\":80,\"aspect\":0.9875,\"fill\":0.9867606471697511,\"expectedDiameterPx\":85.33333333333333}"
+      "detail": "{\"area\":4900,\"w\":79,\"h\":80,\"aspect\":0.9875,\"fill\":0.9871635710763129,\"expectedDiameterPx\":85.33333333333333}"
     },
     {
       "name": "visible size matches physical radius",
@@ -39,7 +39,7 @@
     {
       "name": "vehicles drive on roads, pedestrians on sidewalks/crossings",
       "pass": true,
-      "detail": "{\"cars\":27,\"carsOff\":0,\"peds\":48,\"pedsOff\":0,\"stoppedAtRed\":12}"
+      "detail": "{\"cars\":27,\"carsOff\":0,\"peds\":48,\"pedsOff\":0,\"stoppedAtRed\":11}"
     },
     {
       "name": "no planets or spheres floating over the city",
@@ -59,7 +59,7 @@
     {
       "name": "joystick moves the hole",
       "pass": true,
-      "detail": "moved 2.08 m"
+      "detail": "moved 2.12 m"
     },
     {
       "name": "multitouch: move + ATTRAI together",
@@ -154,7 +154,7 @@
     {
       "name": "pedestrians flee (running) from a dangerous hole",
       "pass": true,
-      "detail": "{\"mode\":\"flee\",\"run\":0.8146869012630524,\"speed\":3.7998904982715995,\"state\":\"rest\"}"
+      "detail": "{\"mode\":\"flee\",\"run\":0.9485809719593791,\"speed\":4.343006968601285,\"state\":\"rest\"}"
     },
     {
       "name": "save restores progress after reload",
@@ -169,7 +169,7 @@
     {
       "name": "camera zooms out as the hole grows",
       "pass": true,
-      "detail": "camDist 86.1"
+      "detail": "camDist 86.0"
     },
     {
       "name": "a car gets dragged into the hole",
@@ -179,27 +179,27 @@
     {
       "name": "a building tilts, collapses and sinks into the hole",
       "pass": true,
-      "detail": "stress,collapse,collapse,collapse,collapse,collapse,collapse,collapse,missing,missing,missing,missing,missing,missing"
+      "detail": "stress,collapse,collapse,collapse,collapse,collapse,collapse,collapse,gone,gone,gone,gone,gone,gone"
     },
     {
       "name": "growth continues (no cap)",
       "pass": true,
-      "detail": "r=7.35"
+      "detail": "r=6.50"
     },
     {
       "name": "far areas stream in (floating origin rebased)",
       "pass": true,
-      "detail": "full 28, lite 464, origin v2, 4349 ms"
+      "detail": "full 28, lite 464, origin v2, 4805 ms"
     },
     {
       "name": "huge radius still grows",
       "pass": true,
-      "detail": "r=42.2"
+      "detail": "r=37.8"
     },
     {
       "name": "black hole is circular from above (huge)",
       "pass": true,
-      "detail": "{\"area\":5107,\"w\":82,\"h\":82,\"aspect\":1,\"fill\":0.9670485358361803,\"expectedDiameterPx\":85.33333333333333}"
+      "detail": "{\"area\":5202,\"w\":82,\"h\":82,\"aspect\":1,\"fill\":0.9850374943058176,\"expectedDiameterPx\":85.33333333333333}"
     },
     {
       "name": "camera keeps the hole centred",
@@ -214,12 +214,12 @@
     {
       "name": "missions completed and per-type statistics recorded",
       "pass": true,
-      "detail": "{\"done\":5,\"byKind\":26}"
+      "detail": "{\"done\":5,\"byKind\":27}"
     },
     {
       "name": "off-screen instances are not drawn (frustum culling)",
       "pass": true,
-      "detail": "{\"pools\":57,\"meshes\":57,\"instances\":6694,\"visible\":449}"
+      "detail": "{\"pools\":57,\"meshes\":57,\"instances\":6768,\"visible\":453}"
     },
     {
       "name": "statistics screen",

@@ -77,7 +77,7 @@ export class UI {
     ghost.addEventListener('pointerdown', e => { drag = { id: e.pointerId }; ghost.setPointerCapture(e.pointerId); e.preventDefault(); });
     ghost.addEventListener('pointermove', e => {
       if (!drag || e.pointerId !== drag.id) return;
-      const vw = window.innerWidth, vh = window.innerHeight;
+      const vw = g.vw, vh = g.vh;
       g.applySettings({ ...g.settings, control: 'C', joyX: e.clientX / vw, joyY: e.clientY / vh }, true);
       this.layoutEditor();
     });
@@ -179,7 +179,7 @@ export class UI {
   setGuide(g) {
     const el = this.el.guide;
     if (!g) { el.classList.remove('show'); return; }
-    const R = Math.min(window.innerWidth, window.innerHeight) * 0.3;
+    const R = Math.min(this.g.vw, this.g.vh) * 0.3;
     const x = g.cx + Math.cos(g.angle) * R, y = g.cy + Math.sin(g.angle) * R;
     el.style.transform = `translate(${x - 19}px, ${y - 19}px) rotate(${g.angle}rad)`;
     el.classList.add('show');

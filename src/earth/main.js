@@ -217,11 +217,29 @@ class Game {
 
   layoutControls() {
     if (!this.input) return { joy: null, btn: { x: 0, y: 0, w: 0, h: 0 } };
-    return this.input.layout(this.settings, window.innerWidth, window.innerHeight, this.safeArea());
+    return this.input.layout(this.settings, this.vw || window.innerWidth, this.vh || window.innerHeight, this.safeArea());
+  }
+
+  // iOS home-screen apps with a translucent status bar report a viewport that is
+  // shorter than the screen (a black band at the bottom): use the full screen.
+  viewport() {
+    let w = window.innerWidth, h = window.innerHeight;
+    const standalone = navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches;
+    if (standalone && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      const portrait = h >= w;
+      const sh = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+      const sw = portrait ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+      if (sh > h && sh - h < 120) h = sh;
+      if (sw > w && sw - w < 120) w = sw;
+    }
+    const app = document.getElementById('app');
+    app.style.width = `${w}px`; app.style.height = `${h}px`;
+    this.vw = w; this.vh = h;
+    return { w, h };
   }
 
   resize() {
-    const w = window.innerWidth, h = window.innerHeight;
+    const { w, h } = this.viewport();
     const pr = (this.basePR || 1) * this.dynPR;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
@@ -234,7 +252,7 @@ class Game {
 
   // ---- flow -------------------------------------------------------------------
   boot() {
-    this.rig.snap(this.hole, window.innerWidth / window.innerHeight);
+    this.rig.snap(this.hole, this.vw / this.vh);
     this.world.setView(this.hole.x, this.hole.z, this.rig.dist, this.effectiveQuality());
     this.world.syncAll();
     for (let k = 0; k < 30; k++) this.traffic.spawn(true);
@@ -307,7 +325,7 @@ class Game {
     rebase(s.x, s.z);
     this.world.onRebase();
     this.tierIndex = 1;
-    this.rig.snap(this.hole, window.innerWidth / window.innerHeight);
+    this.rig.snap(this.hole, this.vw / this.vh);
     this.world.setView(this.hole.x, this.hole.z, this.rig.dist, this.effectiveQuality());
     this.world.syncAll();
     for (let k = 0; k < 30; k++) this.traffic.spawn(true);
@@ -366,7 +384,7 @@ class Game {
     for (const m of activeMissions(s.missions, s.stats.byKind, this.hole.mass)) {
       if (m.have < m.n) continue;
       s.missions.push(m.id);
-      const bonus = missionReward(this.hole.mass);
+      const bonus = missionReward(this.hole.mass, m);
       this.hole.mass += bonus;
       this.ui.toast(`Missione completata: ${m.text}`, 3.5);
       this.audio.chime();
@@ -453,8 +471,8 @@ class Game {
   guideAngle(t) {
     _hp.set(t.x - ORIGIN.x, 0, t.z - ORIGIN.z).project(this.camera);
     _hp2.set(this.hole.x - ORIGIN.x, this.hole.y, this.hole.z - ORIGIN.z).project(this.camera);
-    const dx = (_hp.x - _hp2.x) * window.innerWidth, dy = -(_hp.y - _hp2.y) * window.innerHeight;
-    return { angle: Math.atan2(dy, dx), cx: (_hp2.x * 0.5 + 0.5) * window.innerWidth, cy: (-_hp2.y * 0.5 + 0.5) * window.innerHeight };
+    const dx = (_hp.x - _hp2.x) * this.vw, dy = -(_hp.y - _hp2.y) * this.vh;
+    return { angle: Math.atan2(dy, dx), cx: (_hp2.x * 0.5 + 0.5) * this.vw, cy: (-_hp2.y * 0.5 + 0.5) * this.vh };
   }
 
   // ---- main loop ------------------------------------------------------------
@@ -511,12 +529,13 @@ class Game {
       this.traffic.onRebase();
     }
 
-    const aspect = window.innerWidth / window.innerHeight;
+    const aspect = this.vw / this.vh;
     this.rig.update(dt, hole, aspect, this.state === 'menu');
     this.world.setView(hole.x, hole.z, this.rig.dist, this.effectiveQuality());
     let tp = performance.now();
     const lap = k => { const n = performance.now(); this.prof[k] = Math.max(this.prof[k] || 0, n - tp); tp = n; };
-    this.world.update(dt, this.state === 'play' ? 5 : 8); lap('world');
+    this.world.update(dt, this.state === 'play' ? 5 : 8);
+    this.world.updateMacro(this.rig.dist); lap('world');
 
     if (sim) {
       this.traffic.update(simDt); lap('traffic');
