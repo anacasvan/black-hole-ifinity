@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const src=fs.readFileSync(path.join(root,'src/three-d/game.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'demo.html'),'utf8');
+const shell=fs.readFileSync(path.join(root,'src/three-d/shell.html'),'utf8');
+for (const key of ['getContext(\'webgl2\'','layout(location=0)','uVP','uModel','function objectMesh','function blackHole','function move(dt)','o.vy+=','Math.exp(-dt','function setupPhase','testStep']) assert.ok(src.includes(key),`Missing 3D feature: ${key}`);
+for(const key of ['id="joystick"','id="gravity"','id="gravityValue"','id="zen"','id="pause"']) assert.ok(shell.includes(key),`Missing UI control: ${key}`);
+assert.ok(html.length>500_000,'Expected offline standalone demo');
+assert.ok(!html.includes('__BHI_ASSET_DATA__'),'Embedded assets not compiled');
+assert.ok(!html.includes('__BHI_CLASSIC_FALLBACK__'),'Embedded fallback not compiled');
+assert.ok(html.includes('terrain3d') && html.includes('WebGL2'),'Missing offline 3D runtime');
+console.log('✓ Source Gravity 3D, UI joystick, gravity slider, embedded assets and 2D fallback verified.');

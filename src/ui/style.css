@@ -1,0 +1,1 @@
+:root{background:#080d14;color:white;color-scheme:dark}*{box-sizing:border-box}html,body,#root{margin:0;height:100%;width:100%;overflow:hidden}.app-shell{position:fixed;inset:0;overflow:hidden}.game-frame{display:block;width:100%;height:100%;border:0;background:#080d14;touch-action:none}

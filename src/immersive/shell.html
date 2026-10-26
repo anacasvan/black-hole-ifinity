@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#080e24">
+<title>Black Hole Infinity — Immersive Edition</title>
+<style><!--BHI_STYLE--></style>
+</head>
+<body>
+<canvas id="game" aria-label="Mondo di gioco: trascina il dito per spostare il buco nero"></canvas><div id="shade"></div><div id="joystick" aria-hidden="true"><div id="stick"></div></div><div id="pickup" aria-hidden="true">+ MASSA</div>
+<div class="hud hidden" id="hud"><div class="hdr"><div><div class="overline">ORIGINE · <span id="universe">UNIVERSO 01</span></div><div class="stage" id="stage">Giardino terrestre</div></div><div class="pill" id="collected">0 assorbiti</div></div><div class="growth"><span id="level">Dimensione · granello</span><span id="next">Prossimo: città</span></div><div class="track"><div class="fill" id="progress"></div></div></div>
+<div class="foot hidden" id="footer"><div class="hint" id="hint">Tocca e trascina per esplorare</div><button id="zen" aria-label="Attiva modalità zen">Zen</button><button id="pause" aria-label="Metti in pausa">Ⅱ</button></div>
+<div class="toast" id="toast"><strong id="toast-title"></strong><span id="toast-sub"></span></div>
+<div class="overlay" id="menu"><div class="panel"><div class="logo"></div><div class="eyebrow">UN VIAGGIO SENZA FINE</div><h1 class="title">Black Hole <span>Infinity</span></h1><p class="subtitle">Dal primo granello di terra all’ultimo confine del cosmo. Lascia che tutto venga a te, un oggetto alla volta.</p><button class="primary" id="play">Entra nell’universo &nbsp; ↗</button><button class="secondary" id="menuSettings">⚙ Impostazioni</button><div class="micro">NESSUN TIMER &nbsp; · &nbsp; NESSUNA SCONFITTA &nbsp; · &nbsp; SALVATAGGIO AUTOMATICO</div></div></div>
+<div class="overlay hidden" id="pausePanel"><div class="panel"><h2 class="sectiontitle">Il tempo è tuo</h2><p class="subtitle" style="text-align:left;margin-left:0">Ogni stella ti aspetterà. Riprendi quando vuoi.</p><button class="primary" id="resume">Continua a giocare →</button><button class="secondary" id="pauseSettings">⚙ Impostazioni</button><button class="secondary" id="backMenu">⌂ Menu principale</button></div></div>
+<div class="overlay hidden" id="settingsPanel"><div class="panel"><h2 class="sectiontitle">Impostazioni</h2><div class="setting"><label>🎼 Musica ambient</label><button id="music" class="toggle on" aria-label="Musica attiva">ON</button></div><div class="setting"><label>✦ Effetti sonori</label><button id="sfx" class="toggle on" aria-label="Effetti sonori attivi">ON</button></div><div class="setting"><label for="volume">Volume</label><input class="range" type="range" min="0" max="100" value="32" id="volume"></div><div class="setting"><label>🌠 Particelle</label><button id="particles" class="toggle on" aria-label="Particelle attive">ON</button></div><button class="secondary" id="reset" style="margin-top:19px">Ricomincia da zero</button><button class="primary" id="closeSettings" style="margin-top:12px">Torna al gioco</button></div></div>
+<script><!--BHI_SCRIPT--></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f17" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Black Hole" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="description" content="Black Hole Infinity — Earth Edition: un buco nero che cresce lentamente in una città 3D viva." />
+  <title>Black Hole Infinity — Earth Edition</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%239fb0ff' fill-opacity='.35'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23000'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene"></canvas>
+
+    <div id="controls" class="layer hidden">
+      <div id="joy" class="joy"><div class="joy-ring"></div><div class="joy-knob"></div></div>
+      <button id="btn-attract" class="attract" type="button" aria-label="Attrai"><span class="attract-core"></span><span class="attract-label">ATTRAI</span></button>
+      <div id="touch-ind" class="touch-ind"></div>
+    </div>
+
+    <div id="hud" class="hidden">
+      <div class="hud-top">
+        <div class="mass-pill" id="mass-pill">
+          <span class="mass-dot"></span>
+          <div class="mass-text"><span class="mass-label">Massa</span><span id="mass-value">0</span></div>
+        </div>
+        <div class="progress">
+          <div class="progress-label"><span>Prossimo</span> <b id="next-name">—</b></div>
+          <div class="bar"><div id="progress-fill"></div></div>
+        </div>
+        <button id="btn-pause" class="icon-btn" type="button" aria-label="Pausa"><svg viewBox="0 0 24 24" width="18" height="18"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg></button>
+      </div>
+      <div id="toast" class="toast"></div>
+    </div>
+
+    <section id="menu" class="screen">
+      <div class="menu-inner">
+        <div class="logo">
+          <svg class="logo-mark" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <radialGradient id="lg-halo" cx="50%" cy="50%" r="50%"><stop offset="55%" stop-color="#8ea2ff" stop-opacity="0"/><stop offset="72%" stop-color="#9fb0ff" stop-opacity="0.75"/><stop offset="100%" stop-color="#6f7cff" stop-opacity="0"/></radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="58" fill="url(#lg-halo)"/>
+            <ellipse cx="60" cy="60" rx="54" ry="15" fill="none" stroke="#cfd8ff" stroke-opacity="0.5" stroke-width="1.5" transform="rotate(-18 60 60)"/>
+            <circle cx="60" cy="60" r="30" fill="#020205"/>
+            <circle cx="60" cy="60" r="30.5" fill="none" stroke="#dfe5ff" stroke-width="1.2" stroke-opacity="0.9"/>
+          </svg>
+          <h1>BLACK HOLE<br /><span>INFINITY</span></h1>
+          <p class="edition">Earth Edition</p>
+        </div>
+        <div class="menu-buttons">
+          <button id="btn-play" class="btn primary" type="button">Gioca</button>
+          <button id="btn-new" class="btn" type="button">Nuova partita</button>
+          <button id="btn-settings" class="btn ghost" type="button">Impostazioni</button>
+        </div>
+        <p class="menu-hint">Tieni premuto <b>ATTRAI</b> per attivare la gravità. Nessun timer, nessuna fretta.</p>
+      </div>
+    </section>
+
+    <section id="pause" class="screen dim hidden">
+      <div class="panel small">
+        <h2>Pausa</h2>
+        <div id="pause-stats" class="stats"></div>
+        <button id="btn-resume" class="btn primary" type="button">Riprendi</button>
+        <button id="btn-pause-settings" class="btn" type="button">Impostazioni</button>
+        <button id="btn-quit" class="btn ghost" type="button">Menu principale</button>
+      </div>
+    </section>
+
+    <section id="settings" class="screen dim hidden">
+      <div class="panel">
+        <header class="panel-head"><h2>Impostazioni</h2><button id="btn-settings-close" class="icon-btn" type="button" aria-label="Chiudi">✕</button></header>
+        <div class="panel-body">
+          <div class="group">
+            <h3>Controlli</h3>
+            <div class="seg" id="seg-control">
+              <button data-v="A" type="button"><i class="ico ico-a"></i>Joystick sinistro</button>
+              <button data-v="B" type="button"><i class="ico ico-b"></i>Joystick destro</button>
+              <button data-v="C" type="button"><i class="ico ico-c"></i>Personalizzato</button>
+              <button data-v="D" type="button"><i class="ico ico-d"></i>Solo touch</button>
+            </div>
+            <button id="btn-edit-joy" class="btn small" type="button">Posiziona il joystick…</button>
+            <label class="row"><span>Dimensione joystick</span><input id="in-joysize" type="range" min="96" max="190" step="2" /></label>
+            <label class="row"><span>Opacità joystick</span><input id="in-joyopacity" type="range" min="0.3" max="1" step="0.05" /></label>
+            <label class="row"><span>Sensibilità movimento</span><input id="in-sens" type="range" min="0.5" max="1.6" step="0.05" /></label>
+            <div class="row"><span>Pulsante ATTRAI</span>
+              <div class="seg mini" id="seg-attract"><button data-v="hold" type="button">Tieni premuto</button><button data-v="toggle" type="button">Interruttore</button></div>
+            </div>
+          </div>
+          <div class="group">
+            <h3>Grafica</h3>
+            <div class="seg" id="seg-quality">
+              <button data-v="auto" type="button">Auto</button><button data-v="low" type="button">Leggera</button><button data-v="medium" type="button">Media</button><button data-v="high" type="button">Alta</button>
+            </div>
+            <label class="row toggle"><span>Riduci effetti visivi</span><input id="in-reduce" type="checkbox" /><i></i></label>
+          </div>
+          <div class="group">
+            <h3>Audio e feedback</h3>
+            <label class="row"><span>Musica</span><input id="in-music" type="range" min="0" max="1" step="0.05" /></label>
+            <label class="row"><span>Effetti</span><input id="in-sfx" type="range" min="0" max="1" step="0.05" /></label>
+            <label class="row toggle"><span>Vibrazione</span><input id="in-vibe" type="checkbox" /><i></i></label>
+          </div>
+          <button id="btn-reset-settings" class="btn ghost small" type="button">Ripristina impostazioni</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="joy-editor" class="screen editor hidden">
+      <div class="editor-hint">Trascina il joystick dove preferisci</div>
+      <div id="joy-ghost" class="joy ghost"><div class="joy-ring"></div><div class="joy-knob"></div></div>
+      <div id="attract-ghost" class="attract ghost"><span class="attract-core"></span><span class="attract-label">ATTRAI</span></div>
+      <div class="editor-bar">
+        <label class="row"><span>Dimensione</span><input id="ed-size" type="range" min="96" max="190" step="2" /></label>
+        <label class="row"><span>Opacità</span><input id="ed-opacity" type="range" min="0.3" max="1" step="0.05" /></label>
+        <button id="btn-editor-done" class="btn primary small" type="button">Fatto</button>
+      </div>
+    </section>
+
+    <section id="confirm" class="screen dim hidden">
+      <div class="panel small">
+        <h2>Nuova partita?</h2>
+        <p>Il buco nero ripartirà da zero e la città tornerà intatta.</p>
+        <button id="btn-confirm-yes" class="btn primary" type="button">Ricomincia</button>
+        <button id="btn-confirm-no" class="btn ghost" type="button">Annulla</button>
+      </div>
+    </section>
+
+    <div id="loading" class="loading"><div class="spinner"></div><p>Costruzione della città…</p></div>
+    <div id="fatal" class="fatal hidden"></div>
+  </div>
+  <script type="module" src="/src/earth/main.js"></script>
+</body>
+</html>

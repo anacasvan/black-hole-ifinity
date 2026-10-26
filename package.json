@@ -1,0 +1,39 @@
+{
+  "name": "black-hole-infinity",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build && node scripts/sw.mjs",
+    "build:standalone": "vite build && node scripts/standalone.mjs",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node tests/earth-logic.test.mjs",
+    "test:e2e": "node tests/e2e-earth.mjs",
+    "test:legacy": "node tests/smoke.cjs && node tests/gravity3d.cjs",
+    "android:add": "npx cap add android",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "ios:add": "npx cap add ios",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:open": "npx cap open ios",
+    "demo:build": "node scripts/build-demo.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.2",
+    "phaser": "3.90.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "playwright-core": "^1.64.1",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0"
+  }
+}

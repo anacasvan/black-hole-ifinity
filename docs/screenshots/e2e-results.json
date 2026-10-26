@@ -1,0 +1,221 @@
+{
+  "date": "2026-10-26T14:32:05.126Z",
+  "results": [
+    {
+      "name": "WebGL2 renderer available",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "menu is shown at start",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "play starts the game",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "portrait viewport",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "audio engine running after the first tap",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "black hole is circular from above (small)",
+      "pass": true,
+      "detail": "{\"area\":4895,\"w\":79,\"h\":80,\"aspect\":0.9875,\"fill\":0.9861562613099085,\"expectedDiameterPx\":85.33333333333333}"
+    },
+    {
+      "name": "visible size matches physical radius",
+      "pass": true,
+      "detail": "79px vs 85px"
+    },
+    {
+      "name": "vehicles drive on roads, pedestrians on sidewalks/crossings",
+      "pass": true,
+      "detail": "{\"cars\":27,\"carsOff\":0,\"peds\":48,\"pedsOff\":0,\"stoppedAtRed\":7}"
+    },
+    {
+      "name": "no planets or spheres floating over the city",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "gravity is off unless ATTRAI is pressed",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "hole starts small (only light objects)",
+      "pass": true,
+      "detail": "r=0.30"
+    },
+    {
+      "name": "joystick moves the hole",
+      "pass": true,
+      "detail": "moved 2.19 m"
+    },
+    {
+      "name": "multitouch: move + ATTRAI together",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "releasing ATTRAI turns gravity off",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ATTRAI toggle mode (tap on / tap off)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (320x568, mode A)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (320x568, mode B)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (320x568, mode C)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (320x568, mode D)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (390x844, mode A)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (390x844, mode B)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (390x844, mode C)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (390x844, mode D)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (844x390, mode A)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (844x390, mode B)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (844x390, mode C)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "controls do not overlap (844x390, mode D)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "touch-only drag moves the hole",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "absorbing objects increases mass",
+      "pass": true,
+      "detail": "mass 0.000 -> 0.241, eaten 7"
+    },
+    {
+      "name": "radius grows with mass",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pedestrians flee (running) from a dangerous hole",
+      "pass": true,
+      "detail": "{\"mode\":\"flee\",\"run\":0.9253996332420016,\"speed\":4.145123197848717}"
+    },
+    {
+      "name": "save restores progress after reload",
+      "pass": true,
+      "detail": "mass 6.032, button \"Continua\""
+    },
+    {
+      "name": "settings (custom joystick) persist",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "camera zooms out as the hole grows",
+      "pass": true,
+      "detail": "camDist 85.7"
+    },
+    {
+      "name": "a car gets dragged into the hole",
+      "pass": true,
+      "detail": "state free"
+    },
+    {
+      "name": "a building tilts, collapses and sinks into the hole",
+      "pass": true,
+      "detail": "stress,collapse,collapse,collapse,collapse,collapse,collapse,collapse,gone,missing,missing,missing,missing,missing"
+    },
+    {
+      "name": "growth continues (no cap)",
+      "pass": true,
+      "detail": "r=6.48"
+    },
+    {
+      "name": "far areas stream in (floating origin rebased)",
+      "pass": true,
+      "detail": "full 29, lite 396, origin v2, 4019 ms"
+    },
+    {
+      "name": "huge radius still grows",
+      "pass": true,
+      "detail": "r=37.8"
+    },
+    {
+      "name": "black hole is circular from above (huge)",
+      "pass": true,
+      "detail": "{\"area\":5204,\"w\":82,\"h\":82,\"aspect\":1,\"fill\":0.9854162092209677,\"expectedDiameterPx\":85.33333333333333}"
+    },
+    {
+      "name": "camera keeps the hole centred",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pause works",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no errors in the console",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "errors": []
+}
